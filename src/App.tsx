@@ -564,6 +564,25 @@ function getDisplayPromptText(prompt: string, language: Language) {
   return prompt
 }
 
+function getDisplayProviderError(error: string | undefined, language: Language) {
+  if (!error) return ''
+
+  if (/input image may contain real person/i.test(error)) {
+    return language === 'en'
+      ? 'The provider rejected this request because the input image may contain a real person.'
+      : '平台拒绝了这次请求，因为输入图片可能包含真人。'
+  }
+
+  if (/not activated the model|ModelNotOpen/i.test(error)) {
+    const model = error.match(/model\s+([A-Za-z0-9._-]+)/i)?.[1]
+    return language === 'en'
+      ? `This Ark account has not activated ${model ?? 'this model'}. Activate it in the Ark Console or choose an activated model.`
+      : `这个火山账号还没有开通 ${model ?? '这个模型'}。请在火山方舟控制台开通，或改用已开通的模型。`
+  }
+
+  return error
+}
+
 function isVideoTaskGenerating(task: VideoTaskSummary) {
   return task.status === 'submitted' && !getVideoPreviewUrl(task)
 }
@@ -1854,6 +1873,9 @@ function App() {
     if (/not activated the model|ModelNotOpen/i.test(task.providerError ?? '')) {
       return tr('模型未开通', 'Model Not Activated')
     }
+    if (/input image may contain real person/i.test(task.providerError ?? '')) {
+      return tr('真人图片被拦截', 'Real Person Blocked')
+    }
     return getVideoStatusLabel(task.status)
   }
 
@@ -2392,7 +2414,7 @@ function App() {
                       {activeVideoTask.missingEnv && activeVideoTask.missingEnv.length > 0 ? <em>{tr(`缺少 API：${activeVideoTask.missingEnv.join('、')}`, `Missing API: ${activeVideoTask.missingEnv.join(', ')}`)}</em> : null}
                       {activeVideoTask.taskId ? <em>{tr(`任务 ID：${activeVideoTask.taskId}`, `Task ID: ${activeVideoTask.taskId}`)}</em> : null}
                       {activeVideoTask.providerTaskStatus && !activeVideoTaskIsGenerating ? <em>{tr(`平台状态：${activeVideoTask.providerTaskStatus}`, `Provider status: ${activeVideoTask.providerTaskStatus}`)}</em> : null}
-                      {activeVideoTask.providerError ? <em>{tr(`平台错误：${activeVideoTask.providerError}`, `Provider error: ${activeVideoTask.providerError}`)}</em> : null}
+                      {activeVideoTask.providerError ? <em>{tr(`平台错误：${getDisplayProviderError(activeVideoTask.providerError, language)}`, `Provider error: ${getDisplayProviderError(activeVideoTask.providerError, language)}`)}</em> : null}
                       <span>{tr(`提交：${formatTaskTime(activeVideoTask.createdAt, language)}`, `Submitted: ${formatTaskTime(activeVideoTask.createdAt, language)}`)}</span>
                       {activeVideoTask.updatedAt ? <span>{tr(`更新：${formatTaskTime(activeVideoTask.updatedAt, language)}`, `Updated: ${formatTaskTime(activeVideoTask.updatedAt, language)}`)}</span> : null}
                       {activeVideoTask.downloadsVideoPath ? <em>{tr(`下载目录：${activeVideoTask.downloadsVideoPath}`, `Downloads folder: ${activeVideoTask.downloadsVideoPath}`)}</em> : null}
@@ -2453,7 +2475,7 @@ function App() {
                             ) : task.providerTaskStatus ? (
                               <span>{tr(`平台状态：${task.providerTaskStatus}`, `Provider status: ${task.providerTaskStatus}`)}</span>
                             ) : task.providerError ? (
-                              <span>{tr(`平台错误：${task.providerError}`, `Provider error: ${task.providerError}`)}</span>
+                              <span>{tr(`平台错误：${getDisplayProviderError(task.providerError, language)}`, `Provider error: ${getDisplayProviderError(task.providerError, language)}`)}</span>
                             ) : null}
                             <small className={`video-status video-status-${task.status}`}>{getVideoTaskStatusLabel(task)}</small>
                           </div>
