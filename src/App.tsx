@@ -1850,6 +1850,12 @@ function App() {
   const getVideoStatusLabel = (statusValue: VideoTaskStatus) => {
     return getVideoStatusText(statusValue, language)
   }
+  const getVideoTaskStatusLabel = (task: VideoTaskSummary) => {
+    if (/not activated the model|ModelNotOpen/i.test(task.providerError ?? '')) {
+      return tr('模型未开通', 'Model Not Activated')
+    }
+    return getVideoStatusLabel(task.status)
+  }
 
   useEffect(() => {
     if (!isVideoPanelOpen) return undefined
@@ -2372,7 +2378,7 @@ function App() {
                   <article className="video-hero-card">
                     <VideoTaskMedia task={activeVideoTask} className="video-hero-media" />
                     <div className="video-hero-info">
-                      <span className={`video-status video-status-${activeVideoTask.status}`}>{getVideoStatusLabel(activeVideoTask.status)}</span>
+                      <span className={`video-status video-status-${activeVideoTask.status}`}>{getVideoTaskStatusLabel(activeVideoTask)}</span>
                       {activeVideoTaskIsGenerating ? (
                         <div className="video-progress">
                           <RefreshCcw className="spin-icon" size={15} />
@@ -2449,7 +2455,7 @@ function App() {
                             ) : task.providerError ? (
                               <span>{tr(`平台错误：${task.providerError}`, `Provider error: ${task.providerError}`)}</span>
                             ) : null}
-                            <small className={`video-status video-status-${task.status}`}>{getVideoStatusLabel(task.status)}</small>
+                            <small className={`video-status video-status-${task.status}`}>{getVideoTaskStatusLabel(task)}</small>
                           </div>
                         </button>
                       ))}
