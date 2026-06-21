@@ -1,5 +1,7 @@
 # Cowart Canvas
 
+**Languages:** [English](README.md) | [简体中文](README.zh-CN.md)
+
 Cowart Canvas is a local browser canvas for marking exactly where an AI image should be edited, then turning those visual notes into a Codex-ready request. It also includes a local image-to-video task panel with front-end API settings and video history.
 
 The interface is bilingual: Chinese and English are both built in, and users can switch languages from the top-left toolbar.
