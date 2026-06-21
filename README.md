@@ -8,6 +8,10 @@ The app runs on your own machine. Imported images, generated task files, video t
 
 ## Screenshots
 
+### Demo Video
+
+[Watch or download the image-to-video demo](docs/videos/01-image-to-video-demo.mp4)
+
 ### Edit Canvas
 
 ![Edit canvas empty state](docs/screenshots/01-edit-canvas-empty.png)
