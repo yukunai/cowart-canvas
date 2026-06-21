@@ -149,7 +149,7 @@ const videoProviderNames: Record<VideoProvider, string> = {
 }
 
 const videoProviderIds: VideoProvider[] = ['kling', 'volcengine', 'wanxiang', 'runway', 'luma', 'fal', 'replicate']
-const defaultArkVideoModel = 'doubao-seedance-2-0-fast-260128'
+const defaultArkVideoModel = 'doubao-seedance-2-0-260128'
 
 const videoConfigFields: Record<VideoProvider, VideoConfigField[]> = {
   kling: [
