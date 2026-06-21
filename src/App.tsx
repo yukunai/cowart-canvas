@@ -129,6 +129,7 @@ type VideoTaskSummary = {
 type VideoTaskActionResponse = {
   task?: VideoTaskSummary
   downloadsVideoPath?: string
+  deletedId?: string
   error?: string
 }
 
@@ -503,6 +504,7 @@ function localizeKnownMessage(message: string, language: Language) {
     保存视频失败: 'Could not save video',
     保存本地视频失败: 'Could not save the local video',
     保存到下载目录失败: 'Could not save to Downloads',
+    删除视频任务失败: 'Could not delete video task',
     读取API设置失败: 'Could not read API settings',
     '读取 API 设置失败': 'Could not read API settings',
     '保存 API 设置失败': 'Could not save API settings',
@@ -648,6 +650,7 @@ function App() {
   const [isVideoTaskRefreshing, setIsVideoTaskRefreshing] = useState(false)
   const [isVideoDownloading, setIsVideoDownloading] = useState(false)
   const [isSavingVideoToDownloads, setIsSavingVideoToDownloads] = useState(false)
+  const [deletingVideoTaskId, setDeletingVideoTaskId] = useState<string | null>(null)
   const [nowTick, setNowTick] = useState(0)
   const [isApiSettingsOpen, setIsApiSettingsOpen] = useState(false)
   const [isApiConfigLoading, setIsApiConfigLoading] = useState(false)
@@ -1158,6 +1161,40 @@ function App() {
       }
     },
     [language, tr, updateVideoTaskSummary, videoTasks],
+  )
+
+  const deleteVideoTask = useCallback(
+    async (taskId?: string) => {
+      if (!taskId) return
+      setDeletingVideoTaskId(taskId)
+      setVideoTaskMessage(tr('正在删除这条视频历史...', 'Deleting this video history item...'))
+
+      try {
+        const response = await fetch('/api/video-task-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId }),
+        })
+        const data = (await response.json()) as VideoTaskActionResponse
+        if (!response.ok || data.error || !data.deletedId) throw new Error(data.error || '删除视频任务失败')
+
+        const remainingTasks = videoTasks.filter((task) => task.id !== data.deletedId)
+        setVideoTasks(remainingTasks)
+        setActiveVideoTaskId((current) => {
+          if (current && current !== data.deletedId && remainingTasks.some((task) => task.id === current)) return current
+          return remainingTasks[0]?.id ?? null
+        })
+        setVideoTaskMessage(tr('已删除这条视频历史。', 'Video history item deleted.'))
+        setStatus(tr('已删除这条视频历史。', 'Video history item deleted.'))
+      } catch (error) {
+        const message = error instanceof Error ? localizeKnownMessage(error.message, language) : tr('删除视频任务失败', 'Could not delete video task')
+        setVideoTaskMessage(message)
+        setStatus(tr(`删除视频任务失败：${message}`, `Could not delete video task: ${message}`))
+      } finally {
+        setDeletingVideoTaskId(null)
+      }
+    },
+    [language, tr, videoTasks],
   )
 
   const applyVideoConfigResponse = (data: VideoConfigResponse) => {
@@ -2446,6 +2483,15 @@ function App() {
                             {isVideoDownloading ? tr('保存中', 'Saving') : tr('保存到本地', 'Save Locally')}
                           </button>
                         ) : null}
+                        <button
+                          type="button"
+                          className="danger-action-button"
+                          onClick={() => void deleteVideoTask(activeVideoTask.id)}
+                          disabled={deletingVideoTaskId === activeVideoTask.id}
+                        >
+                          <Trash2 size={15} />
+                          {deletingVideoTaskId === activeVideoTask.id ? tr('删除中', 'Deleting') : tr('删除记录', 'Delete Record')}
+                        </button>
                       </div>
                     </div>
                   </article>
@@ -2457,29 +2503,42 @@ function App() {
                     </div>
                     <div className="video-showcase-list" aria-label={tr('历史生成视频', 'Video history')}>
                       {videoTasks.slice(0, 24).map((task) => (
-                        <button
+                        <div
                           key={task.id}
-                          type="button"
                           className={`video-showcase-item ${activeVideoTask.id === task.id ? 'selected' : ''}`}
-                          onClick={() => setActiveVideoTaskId(task.id)}
                         >
-                          <VideoTaskMedia task={task} />
-                          <div>
-                            <strong>{task.title}</strong>
-                            <span>{getVideoTaskDetailText(task, language) || getVideoProviderText(task.provider, language, task.providerName) || tr('视频任务', 'Video task')}</span>
-                            {isVideoTaskGenerating(task) ? (
-                              <span className="video-mini-progress">
-                                <RefreshCcw className="spin-icon" size={11} />
-                                {formatElapsedTime(task.createdAt, nowTick, language)}
-                              </span>
-                            ) : task.providerTaskStatus ? (
-                              <span>{tr(`平台状态：${task.providerTaskStatus}`, `Provider status: ${task.providerTaskStatus}`)}</span>
-                            ) : task.providerError ? (
-                              <span>{tr(`平台错误：${getDisplayProviderError(task.providerError, language)}`, `Provider error: ${getDisplayProviderError(task.providerError, language)}`)}</span>
-                            ) : null}
-                            <small className={`video-status video-status-${task.status}`}>{getVideoTaskStatusLabel(task)}</small>
-                          </div>
-                        </button>
+                          <button
+                            type="button"
+                            className="video-showcase-main"
+                            onClick={() => setActiveVideoTaskId(task.id)}
+                          >
+                            <VideoTaskMedia task={task} />
+                            <div>
+                              <strong>{task.title}</strong>
+                              <span>{getVideoTaskDetailText(task, language) || getVideoProviderText(task.provider, language, task.providerName) || tr('视频任务', 'Video task')}</span>
+                              {isVideoTaskGenerating(task) ? (
+                                <span className="video-mini-progress">
+                                  <RefreshCcw className="spin-icon" size={11} />
+                                  {formatElapsedTime(task.createdAt, nowTick, language)}
+                                </span>
+                              ) : task.providerTaskStatus ? (
+                                <span>{tr(`平台状态：${task.providerTaskStatus}`, `Provider status: ${task.providerTaskStatus}`)}</span>
+                              ) : task.providerError ? (
+                                <span>{tr(`平台错误：${getDisplayProviderError(task.providerError, language)}`, `Provider error: ${getDisplayProviderError(task.providerError, language)}`)}</span>
+                              ) : null}
+                              <small className={`video-status video-status-${task.status}`}>{getVideoTaskStatusLabel(task)}</small>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            className="video-history-delete"
+                            aria-label={tr(`删除 ${task.title}`, `Delete ${task.title}`)}
+                            onClick={() => void deleteVideoTask(task.id)}
+                            disabled={deletingVideoTaskId === task.id}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </aside>

@@ -907,6 +907,14 @@ function getVideoTaskTarget(id?: string) {
   return { directory, directoryName: path.basename(directory) }
 }
 
+function deleteVideoTask(id?: string) {
+  const target = getVideoTaskTarget(id)
+  if (!target) throw new Error('找不到这个视频任务')
+
+  fs.rmSync(target.directory, { recursive: true, force: true })
+  return target.directoryName
+}
+
 function buildDashScopeTaskEndpoint(taskId: string) {
   const explicitEndpoint = process.env.DASHSCOPE_VIDEO_TASK_ENDPOINT || process.env.DASHSCOPE_TASK_ENDPOINT
   if (explicitEndpoint) return explicitEndpoint.replace(/\{task_id\}|\{taskId\}/g, encodeURIComponent(taskId))
@@ -1330,6 +1338,23 @@ function localImageImportPlugin(): PluginOption {
         } catch (error) {
           res.statusCode = 400
           sendJson(res, { error: error instanceof Error ? error.message : 'Could not save video to Downloads' })
+        }
+      })
+
+      server.middlewares.use('/api/video-task-delete', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          sendJson(res, { error: 'Method not allowed' })
+          return
+        }
+
+        try {
+          const body = (await readJsonBody(req, 1024 * 1024)) as VideoTaskActionRequest
+          const deletedId = deleteVideoTask(body.id)
+          sendJson(res, { deletedId })
+        } catch (error) {
+          res.statusCode = 400
+          sendJson(res, { error: error instanceof Error ? error.message : 'Could not delete video task' })
         }
       })
 
