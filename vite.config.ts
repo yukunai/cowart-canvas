@@ -99,6 +99,7 @@ type VideoTaskSummary = {
   missingEnv?: string[]
   taskId?: string
   providerTaskStatus?: string
+  providerError?: string
   updatedAt?: string
   videoUrl?: string
   localVideoUrl?: string
@@ -148,6 +149,7 @@ const videoProviderNames: Record<VideoProvider, string> = {
 }
 
 const videoProviderIds: VideoProvider[] = ['kling', 'volcengine', 'wanxiang', 'runway', 'luma', 'fal', 'replicate']
+const defaultArkVideoModel = 'doubao-seedance-2-0-fast-260128'
 
 const videoConfigFields: Record<VideoProvider, VideoConfigField[]> = {
   kling: [
@@ -158,7 +160,7 @@ const videoConfigFields: Record<VideoProvider, VideoConfigField[]> = {
   ],
   volcengine: [
     { key: 'ARK_API_KEY', label: 'API Key', secret: true },
-    { key: 'ARK_VIDEO_MODEL', label: '视频模型' },
+    { key: 'ARK_VIDEO_MODEL', label: '视频模型', placeholder: defaultArkVideoModel },
     { key: 'ARK_VIDEO_ENDPOINT', label: '接口地址', placeholder: 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks' },
   ],
   wanxiang: [
@@ -515,6 +517,42 @@ function extractProviderTaskStatus(payload: unknown, seen = new Set<unknown>()):
   return undefined
 }
 
+function extractProviderError(payload: unknown, seen = new Set<unknown>()): string | undefined {
+  if (!payload) return undefined
+  if (typeof payload === 'string') return payload.trim() || undefined
+  if (typeof payload !== 'object') return undefined
+  if (seen.has(payload)) return undefined
+  seen.add(payload)
+
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const nested = extractProviderError(item, seen)
+      if (nested) return nested
+    }
+    return undefined
+  }
+
+  const record = payload as Record<string, unknown>
+  for (const key of ['message', 'msg', 'error_message', 'errorMessage']) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+
+  const error = record.error
+  if (typeof error === 'string' && error.trim()) return error.trim()
+  if (error && typeof error === 'object') {
+    const nested = extractProviderError(error, seen)
+    if (nested) return nested
+  }
+
+  return undefined
+}
+
+function sanitizeProviderError(message?: string) {
+  if (!message) return undefined
+  return message.replace(/account\s+\d+/gi, 'account').replace(/Request id:\s*[A-Za-z0-9-]+/gi, 'Request id hidden')
+}
+
 function isProviderFailureStatus(status?: string) {
   if (!status) return false
   return ['failed', 'fail', 'error', 'canceled', 'cancelled', 'rejected'].some((keyword) => status.toLowerCase().includes(keyword))
@@ -564,6 +602,7 @@ function summarizeVideoTask(directory: string, directoryName: string): VideoTask
   const videoUrl = extractVideoUrl(payload) ?? extractVideoUrl(previousPayload)
   const ok = providerResponseRecord?.ok === true
   const providerTaskStatus = extractProviderTaskStatus(payload) ?? extractProviderTaskStatus(previousPayload)
+  const providerError = sanitizeProviderError(extractProviderError(payload) ?? extractProviderError(previousPayload))
   const status: VideoTaskStatus = localVideoPath
     ? 'saved'
     : videoUrl
@@ -593,6 +632,7 @@ function summarizeVideoTask(directory: string, directoryName: string): VideoTask
     missingEnv,
     taskId: extractProviderTaskId(payload) ?? extractProviderTaskId(previousPayload),
     providerTaskStatus,
+    providerError,
     updatedAt: getString(providerResponseRecord?.refreshedAt) ?? getString(providerResponseRecord?.downloadedAt) ?? getString(providerResponseRecord?.createdAt),
     videoUrl,
     localVideoUrl: localVideoPath ? `/api/local-video?path=${encodeURIComponent(localVideoPath)}` : undefined,
@@ -797,7 +837,7 @@ function buildProviderRequest(provider: VideoProvider, task: VideoTaskRequest, i
   }
 
   if (provider === 'volcengine') {
-    const missingEnv = presentEnv(['ARK_API_KEY', 'ARK_VIDEO_MODEL'])
+    const missingEnv = presentEnv(['ARK_API_KEY'])
     if (missingEnv.length > 0) return { providerName, missingEnv }
 
     return {
@@ -809,7 +849,7 @@ function buildProviderRequest(provider: VideoProvider, task: VideoTaskRequest, i
         'Content-Type': 'application/json',
       },
       body: {
-        model: process.env.ARK_VIDEO_MODEL,
+        model: process.env.ARK_VIDEO_MODEL || defaultArkVideoModel,
         content: [
           { type: 'text', text: prompt },
           { type: 'image_url', image_url: { url: image.dataUrl } },

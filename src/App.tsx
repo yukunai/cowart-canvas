@@ -55,6 +55,10 @@ function getDefaultStatus(language: Language) {
     : '上传、粘贴或拖入任意图片，然后在问题位置写修改意见'
 }
 
+function getDragHintDefault(language: Language) {
+  return language === 'en' ? 'Release to import image' : '松手导入图片'
+}
+
 type RecentImage = {
   path: string
   name: string
@@ -114,6 +118,7 @@ type VideoTaskSummary = {
   missingEnv?: string[]
   taskId?: string
   providerTaskStatus?: string
+  providerError?: string
   updatedAt?: string
   videoUrl?: string
   localVideoUrl?: string
@@ -218,6 +223,10 @@ type CanvasReference = {
   imageId?: string
 }
 
+function createCanvasReference(index: number): CanvasReference {
+  return { id: `reference-${index + 1}`, label: `reference-${index + 1}` }
+}
+
 const colorOptions = ['#111827', '#6b7280', '#d946ef', '#8b5cf6', '#2563eb', '#0ea5e9', '#f59e0b', '#ea580c', '#059669', '#16a34a', '#f87171', '#dc2626']
 const sizeOptions: AnnotationSize[] = ['s', 'm', 'l', 'xl']
 const sizeLabel: Record<AnnotationSize, string> = {
@@ -269,6 +278,10 @@ const annotationKindLabelsEn: Record<CanvasAnnotation['kind'], string> = {
 
 function getAnnotationKindLabel(kind: CanvasAnnotation['kind'], language: Language) {
   return language === 'en' ? annotationKindLabelsEn[kind] : annotationKindLabels[kind]
+}
+
+function getReferenceLabel(index: number, language: Language) {
+  return language === 'en' ? `Reference ${index + 1}` : `素材 ${index + 1}`
 }
 
 const imageSourceLabels: Record<GeneratedImage['source'], string> = {
@@ -458,6 +471,99 @@ function getVideoTaskDetailText(task: VideoTaskSummary, language: Language) {
     .join(' · ')
 }
 
+function getVideoConfigFieldLabel(field: VideoConfigField, language: Language) {
+  const labels: Record<string, { zh: string; en: string }> = {
+    KLING_VIDEO_MODEL: { zh: '模型', en: 'Model' },
+    KLING_BASE_URL: { zh: '接口地址', en: 'Base URL' },
+    ARK_VIDEO_MODEL: { zh: '视频模型', en: 'Video Model' },
+    ARK_VIDEO_ENDPOINT: { zh: '接口地址', en: 'Endpoint' },
+    DASHSCOPE_VIDEO_MODEL: { zh: '模型', en: 'Model' },
+    DASHSCOPE_VIDEO_ENDPOINT: { zh: '接口地址', en: 'Endpoint' },
+    RUNWAY_VIDEO_MODEL: { zh: '模型', en: 'Model' },
+    RUNWAY_API_VERSION: { zh: 'API 版本', en: 'API Version' },
+    RUNWAY_VIDEO_ENDPOINT: { zh: '接口地址', en: 'Endpoint' },
+    LUMA_VIDEO_MODEL: { zh: '模型', en: 'Model' },
+    LUMA_VIDEO_ENDPOINT: { zh: '接口地址', en: 'Endpoint' },
+    FAL_VIDEO_MODEL: { zh: '模型路径', en: 'Model Path' },
+    FAL_VIDEO_ENDPOINT: { zh: '接口地址', en: 'Endpoint' },
+    REPLICATE_VIDEO_VERSION: { zh: '模型版本', en: 'Model Version' },
+    REPLICATE_VIDEO_ENDPOINT: { zh: '接口地址', en: 'Endpoint' },
+  }
+  const localized = labels[field.key]
+  if (localized) return language === 'en' ? localized.en : localized.zh
+  return field.label
+}
+
+function localizeKnownMessage(message: string, language: Language) {
+  if (language !== 'en') return message
+
+  const exact: Record<string, string> = {
+    读取视频结果失败: 'Could not read video results',
+    查询视频结果失败: 'Could not check video result',
+    保存视频失败: 'Could not save video',
+    保存本地视频失败: 'Could not save the local video',
+    保存到下载目录失败: 'Could not save to Downloads',
+    读取API设置失败: 'Could not read API settings',
+    '读取 API 设置失败': 'Could not read API settings',
+    '保存 API 设置失败': 'Could not save API settings',
+    还没有读到这个平台的设置项: 'No settings were found for this provider yet',
+    找不到这个视频任务: 'Video task not found',
+    读不到这个视频任务: 'Could not read this video task',
+    '这个任务还没有平台任务 ID': 'This task does not have a provider task ID yet',
+    '缺少 DASHSCOPE_API_KEY，不能查询阿里万象任务': 'Missing DASHSCOPE_API_KEY, so the Wanxiang task cannot be checked',
+    平台结果已更新但本地摘要读取失败: 'Provider result was updated, but the local summary could not be read',
+    '平台结果已更新，但本地摘要读取失败': 'Provider result was updated, but the local summary could not be read',
+    平台还没有返回可下载的视频地址: 'The provider has not returned a downloadable video URL yet',
+    平台视频文件为空: 'The provider video file is empty',
+    视频已保存但本地摘要读取失败: 'Video was saved, but the local summary could not be read',
+    '视频已保存，但本地摘要读取失败': 'Video was saved, but the local summary could not be read',
+    '还没有本地视频文件，请先点“保存到本地”': 'There is no local video file yet. Click Save Locally first.',
+    创建视频任务失败: 'Could not create the video task',
+    读不到当前原图: 'Could not read the current source image',
+    当前文件不是图片: 'The current file is not an image',
+    '保存 Codex 任务失败': 'Could not save the Codex task',
+    可以先从最近生成里点一张作为视频首帧: 'Pick a recent generated image first to use as the first frame.',
+    '可以先从最近生成里点一张，作为视频首帧': 'Pick a recent generated image first to use as the first frame.',
+    '可以先从最近 Codex 图片里点一张，作为视频首帧': 'Pick a recent generated image first to use as the first frame.',
+  }
+
+  if (exact[message]) return exact[message]
+
+  return message
+    .replace(/可灵/g, 'Kling')
+    .replace(/火山方舟|火山/g, 'Volcano')
+    .replace(/阿里万象|阿里/g, 'Wanxiang')
+    .replace(/视频平台密钥/g, 'video provider key')
+    .replace(/视频平台/g, 'video provider')
+    .replace(/任务目录：/g, 'Task folder: ')
+    .replace(/任务 ID：/g, 'Task ID: ')
+    .replace(/平台状态：/g, 'Provider status: ')
+    .replace(/缺少 API：/g, 'Missing API: ')
+    .replace(/缺少 /g, 'Missing ')
+    .replace(/下载平台视频失败：/g, 'Failed to download provider video: ')
+    .replace(/读不到参考素材：/g, 'Could not read reference image: ')
+    .replace(/参考素材不是图片：/g, 'Reference is not an image: ')
+    .replace(/读不到图片：/g, 'Could not read image: ')
+    .replace(/不是图片：/g, 'Not an image: ')
+    .replace(/返回 /g, ' returned ')
+}
+
+function getDisplayPromptText(prompt: string, language: Language) {
+  if (language !== 'en') return prompt
+
+  const singleImagePrefix = '以这张图片作为首帧，生成自然、有镜头运动的视频：'
+  if (prompt.startsWith(singleImagePrefix)) {
+    return `Use this image as the first frame to generate a natural video with camera movement: ${prompt.slice(singleImagePrefix.length)}`
+  }
+
+  const multiImageMatch = prompt.match(/^以这 (\d+) 张图片作为首帧和参考图，生成自然、有镜头运动的视频：(.*)$/s)
+  if (multiImageMatch?.[1]) {
+    return `Use these ${multiImageMatch[1]} images as the first frame and references to generate a natural video with camera movement: ${multiImageMatch[2]?.trim() ?? ''}`
+  }
+
+  return prompt
+}
+
 function isVideoTaskGenerating(task: VideoTaskSummary) {
   return task.status === 'submitted' && !getVideoPreviewUrl(task)
 }
@@ -493,14 +599,14 @@ function App() {
   const [isImageScaleDragging, setIsImageScaleDragging] = useState(false)
   const [referenceSlotCount, setReferenceSlotCount] = useState(0)
   const [canvasReferences, setCanvasReferences] = useState<CanvasReference[]>(
-    () => Array.from({ length: maxCanvasReferenceImages }, (_, index) => ({ id: `reference-${index + 1}`, label: `素材 ${index + 1}` })),
+    () => Array.from({ length: maxCanvasReferenceImages }, (_, index) => createCanvasReference(index)),
   )
   const [referenceSlotSizes, setReferenceSlotSizes] = useState<number[]>(() => Array.from({ length: maxCanvasReferenceImages }, () => defaultReferenceSlotSize))
   const [prompt, setPrompt] = useState('')
   const [panelWidth, setPanelWidth] = useState(380)
   const [status, setStatus] = useState(() => getDefaultStatus(readInitialLanguage()))
   const [isWindowDragging, setIsWindowDragging] = useState(false)
-  const [dragHint, setDragHint] = useState('松手导入图片')
+  const [dragHint, setDragHint] = useState(() => getDragHintDefault(readInitialLanguage()))
   const [recentImages, setRecentImages] = useState<RecentImage[]>([])
   const [isRecentOpen, setIsRecentOpen] = useState(false)
   const [isRecentLoading, setIsRecentLoading] = useState(false)
@@ -549,13 +655,15 @@ function App() {
     ]
 
     if (videoFirstFrameStatuses.includes(status)) {
-      return isVideoPanelOpen && !activeImage ? tr('可以先从最近生成里点一张，作为视频首帧', 'Pick a recent generated image first to use as the first frame.') : status
+      return isVideoPanelOpen && !activeImage ? tr('可以先从最近生成里点一张，作为视频首帧', 'Pick a recent generated image first to use as the first frame.') : localizeKnownMessage(status, language)
     }
     if (defaultStatuses.includes(status)) {
       return isVideoPanelOpen && !activeImage ? tr('可以先从最近生成里点一张，作为视频首帧', 'Pick a recent generated image first to use as the first frame.') : getDefaultStatus(language)
     }
-    return status
+    return localizeKnownMessage(status, language)
   }, [activeImage, isVideoPanelOpen, language, status, tr])
+  const displayVideoTaskMessage = useMemo(() => videoTaskMessage.split('\n').map((line) => localizeKnownMessage(line, language)).join('\n'), [language, videoTaskMessage])
+  const displayVideoConfigMessage = useMemo(() => localizeKnownMessage(videoConfigMessage, language), [language, videoConfigMessage])
 
   const filledCanvasReferences = useMemo(
     () =>
@@ -603,14 +711,14 @@ function App() {
   const addReferenceCanvasSlot = useCallback(() => {
     setReferenceSlotCount((current) => {
       if (current >= maxCanvasReferenceImages) {
-        setStatus(`最多先放 ${maxCanvasReferenceImages} 个扩展画布位`)
+        setStatus(tr(`最多先放 ${maxCanvasReferenceImages} 个扩展画布位`, `You can add up to ${maxCanvasReferenceImages} extra canvas slots for now.`))
         return current
       }
       const next = current + 1
-      setStatus(`已增加第 ${next} 个下方画布位，可放入任意产品、物件或风格参考图`)
+      setStatus(tr(`已增加第 ${next} 个下方画布位，可放入任意产品、物件或风格参考图`, `Added extra canvas slot ${next}. Drop any product, object, or style reference there.`))
       return next
     })
-  }, [])
+  }, [tr])
 
   const fillCanvasReferenceSlots = useCallback((imageIds: string[], targetSlotIndex?: number) => {
     const next = canvasReferences.map((reference) => ({ ...reference }))
@@ -639,63 +747,63 @@ function App() {
     (imageId: string, targetSlotIndex?: number) => {
       const image = images.find((item) => item.id === imageId)
       if (!image) {
-        setStatus('没有找到这张素材图，重新导入一次')
+        setStatus(tr('没有找到这张素材图，重新导入一次', 'Could not find that reference image. Import it again.'))
         return
       }
       fillCanvasReferenceSlots([imageId], targetSlotIndex)
-      setStatus(`已把「${image.title}」放入下方参考素材槽`)
+      setStatus(tr(`已把「${image.title}」放入下方参考素材槽`, `"${image.title}" was added to a reference slot below.`))
     },
-    [fillCanvasReferenceSlots, images],
+    [fillCanvasReferenceSlots, images, tr],
   )
 
   const addReferenceFiles = useCallback(
     (files: File[], targetSlotIndex?: number) => {
       const imageFiles = files.filter((file) => file.type.startsWith('image/'))
       if (imageFiles.length === 0) {
-        setStatus('没有读到素材图片文件')
+        setStatus(tr('没有读到素材图片文件', 'No reference image files were found.'))
         return
       }
 
       const imported = imageFiles.slice(0, maxCanvasReferenceImages).map((file, index) => ({
         id: `reference-uploaded-${Date.now()}-${index}-${file.name}`,
-        title: file.name.replace(/\.[^.]+$/, '') || '素材图片',
+        title: file.name.replace(/\.[^.]+$/, '') || tr('素材图片', 'Reference image'),
         src: URL.createObjectURL(file),
-        prompt: `用户导入参考素材：${file.name}`,
+        prompt: tr(`用户导入参考素材：${file.name}`, `User imported reference image: ${file.name}`),
         source: 'uploaded' as const,
       }))
 
       setImages((items) => [...imported, ...items])
       fillCanvasReferenceSlots(imported.map((image) => image.id), targetSlotIndex)
-      setStatus(`已导入 ${imported.length} 张参考素材，可和主图融合生成`)
+      setStatus(tr(`已导入 ${imported.length} 张参考素材，可和主图融合生成`, `Imported ${imported.length} reference image${imported.length > 1 ? 's' : ''}. They can be blended with the main image.`))
     },
-    [fillCanvasReferenceSlots],
+    [fillCanvasReferenceSlots, tr],
   )
 
   const addImportedFiles = useCallback((files: File[]) => {
     const imported = files.map((file) => ({
       id: `uploaded-${Date.now()}-${file.name}`,
-      title: file.name.replace(/\.[^.]+$/, '') || '粘贴图片',
+      title: file.name.replace(/\.[^.]+$/, '') || tr('粘贴图片', 'Pasted image'),
       src: URL.createObjectURL(file),
-      prompt: `用户导入图片：${file.name}`,
+      prompt: tr(`用户导入图片：${file.name}`, `User imported image: ${file.name}`),
       source: 'uploaded' as const,
     }))
 
     setImages((items) => [...imported, ...items])
     if (!isVideoPanelOpen && hasReferenceCanvas && activeImageId) {
       fillCanvasReferenceSlots(imported.map((image) => image.id))
-      setStatus(`已导入 ${imported.length} 张图片，并放入下方参考素材槽`)
+      setStatus(tr(`已导入 ${imported.length} 张图片，并放入下方参考素材槽`, `Imported ${imported.length} image${imported.length > 1 ? 's' : ''} and added them to the reference slots below.`))
       return
     }
     setActiveImageId(imported[0].id)
     if (isVideoPanelOpen) addVideoImages(imported.map((image) => image.id))
     setZoomMode('fit')
-    setStatus(isVideoPanelOpen ? `已导入 ${imported.length} 张图片，并加入视频参考图` : `已导入 ${imported.length} 张图片，可以直接在画布上标注`)
-  }, [activeImageId, addVideoImages, fillCanvasReferenceSlots, hasReferenceCanvas, isVideoPanelOpen])
+    setStatus(isVideoPanelOpen ? tr(`已导入 ${imported.length} 张图片，并加入视频参考图`, `Imported ${imported.length} image${imported.length > 1 ? 's' : ''} and added them to video references.`) : tr(`已导入 ${imported.length} 张图片，可以直接在画布上标注`, `Imported ${imported.length} image${imported.length > 1 ? 's' : ''}. You can mark them on the canvas now.`))
+  }, [activeImageId, addVideoImages, fillCanvasReferenceSlots, hasReferenceCanvas, isVideoPanelOpen, tr])
 
   const editPrompt = useMemo(() => {
     if (!activeImage) return ''
     const referenceNotes = filledCanvasReferences
-      .map((item, index) => `${index + 1}. ${item.reference.label}：${item.image.title}`)
+      .map((item, index) => tr(`${index + 1}. ${getReferenceLabel(item.index, 'zh')}：${item.image.title}`, `${index + 1}. ${getReferenceLabel(item.index, 'en')}: ${item.image.title}`))
       .join('\n')
     if (annotations.length === 0 && filledCanvasReferences.length === 0) {
       return tr(`请基于这张图片继续改图：${activeImage.title}\n还没有画布标注。`, `Continue editing this image: ${activeImage.title}\nNo canvas annotations yet.`)
@@ -729,7 +837,7 @@ function App() {
   const importFiles = (fileList: FileList | File[]) => {
     const files = Array.from(fileList).filter((file) => file.type.startsWith('image/'))
     if (files.length === 0) {
-      setStatus('没有读到图片文件')
+      setStatus(tr('没有读到图片文件', 'No image files were found.'))
       return
     }
 
@@ -739,12 +847,12 @@ function App() {
   const placeImageOnCanvas = (imageId: string) => {
     const image = images.find((item) => item.id === imageId)
     if (!image) {
-      setStatus('没有找到这张图片，重新上传一次')
+      setStatus(tr('没有找到这张图片，重新上传一次', 'Could not find that image. Upload it again.'))
       return
     }
     setActiveImageId(image.id)
     setZoomMode('fit')
-    setStatus('已把图片放到画布，并自动适应右侧可视区域')
+    setStatus(tr('已把图片放到画布，并自动适应右侧可视区域', 'Image placed on the canvas and fitted to the right-side viewport.'))
   }
 
   const removeImage = (imageId: string) => {
@@ -770,14 +878,14 @@ function App() {
       setActiveImageId(nextImages[0]?.id ?? null)
       setDraftShape(null)
     }
-    setStatus(nextImages.length > 0 ? `已移除「${image.title}」` : '已移除图片，画布已清空')
+    setStatus(nextImages.length > 0 ? tr(`已移除「${image.title}」`, `Removed "${image.title}".`) : tr('已移除图片，画布已清空', 'Image removed. The canvas is now empty.'))
   }
 
   const setCanvasZoom = (nextScale: number) => {
     const clamped = clampCanvasScale(nextScale)
     setZoomMode('manual')
     setCanvasScale(clamped)
-    setStatus(`画布缩放 ${Math.round(clamped * 100)}%`)
+    setStatus(tr(`画布缩放 ${Math.round(clamped * 100)}%`, `Canvas zoom ${Math.round(clamped * 100)}%`))
   }
 
   const fitCanvasToView = useCallback(() => {
@@ -812,24 +920,24 @@ function App() {
     if (!localUrl && !/^https?:\/\//.test(trimmed) && !trimmed.startsWith('blob:') && !trimmed.startsWith('data:image/')) return false
     const next: GeneratedImage = {
       id: `url-${Date.now()}`,
-      title: localUrl ? trimmed.split('/').pop() || '本机图片' : '外部图片',
+      title: localUrl ? trimmed.split('/').pop() || tr('本机图片', 'Local image') : tr('外部图片', 'External image'),
       src,
-      prompt: `外部图片：${trimmed}`,
+      prompt: tr(`外部图片：${trimmed}`, `External image: ${trimmed}`),
       source: 'url',
       filePath,
     }
     setImages((items) => [next, ...items])
     if (!isVideoPanelOpen && hasReferenceCanvas && activeImageId) {
       fillCanvasReferenceSlots([next.id])
-      setStatus('已从拖入的图片链接加入下方参考素材槽')
+      setStatus(tr('已从拖入的图片链接加入下方参考素材槽', 'Dropped image link added to the reference slot below.'))
       return true
     }
     setActiveImageId(next.id)
     if (isVideoPanelOpen) addVideoImages([next.id])
     setZoomMode('fit')
-    setStatus(isVideoPanelOpen ? '已从拖入的图片链接加入视频参考图' : '已从拖入的图片链接创建画布图片')
+    setStatus(isVideoPanelOpen ? tr('已从拖入的图片链接加入视频参考图', 'Dropped image link added to video references.') : tr('已从拖入的图片链接创建画布图片', 'Canvas image created from the dropped image link.'))
     return true
-  }, [activeImageId, addVideoImages, fillCanvasReferenceSlots, hasReferenceCanvas, isVideoPanelOpen])
+  }, [activeImageId, addVideoImages, fillCanvasReferenceSlots, hasReferenceCanvas, isVideoPanelOpen, tr])
 
   const loadRecentImages = async () => {
     setIsRecentOpen(true)
@@ -878,7 +986,7 @@ function App() {
       id: `recent-${image.mtimeMs}-${image.name}`,
       title: image.name.replace(/\.[^.]+$/, '') || tr('最近图片', 'Recent image'),
       src: image.url,
-      prompt: `最近本机图片：${image.path}`,
+      prompt: tr(`最近本机图片：${image.path}`, `Recent local image: ${image.path}`),
       source: 'recent',
       filePath: image.path,
     }
@@ -908,11 +1016,11 @@ function App() {
         return nextTasks[0]?.id ?? null
       })
     } catch (error) {
-      setVideoTaskMessage(error instanceof Error ? error.message : '读取视频结果失败')
+      setVideoTaskMessage(error instanceof Error ? localizeKnownMessage(error.message, language) : tr('读取视频结果失败', 'Could not read video results'))
     } finally {
       setIsVideoTasksLoading(false)
     }
-  }, [])
+  }, [language, tr])
 
   const updateVideoTaskSummary = useCallback((task: VideoTaskSummary) => {
     setVideoTasks((items) => {
@@ -927,7 +1035,7 @@ function App() {
       if (!taskId) return
       if (!options?.silent) {
         setIsVideoTaskRefreshing(true)
-        setVideoTaskMessage('正在查询平台视频结果...')
+        setVideoTaskMessage(tr('正在查询平台视频结果...', 'Checking provider video result...'))
       }
 
       try {
@@ -944,15 +1052,15 @@ function App() {
           ? tr(`平台状态：${data.task.providerTaskStatus}`, `Provider status: ${data.task.providerTaskStatus}`)
           : getVideoStatusText(data.task.status, language)
         if (!options?.silent) {
-          const message = getVideoPreviewUrl(data.task) ? '已经拿到视频，可以在右侧预览或下载' : `还在生成中，${stateText}`
+          const message = getVideoPreviewUrl(data.task) ? tr('已经拿到视频，可以在右侧预览或下载', 'Video is ready. Preview or download it on the right.') : tr(`还在生成中，${stateText}`, `Still generating. ${stateText}`)
           setVideoTaskMessage(message)
           setStatus(message)
         }
       } catch (error) {
         if (!options?.silent) {
-          const message = error instanceof Error ? error.message : '查询视频结果失败'
+          const message = error instanceof Error ? localizeKnownMessage(error.message, language) : tr('查询视频结果失败', 'Could not check video result')
           setVideoTaskMessage(message)
-          setStatus(`查询视频结果失败：${message}`)
+          setStatus(tr(`查询视频结果失败：${message}`, `Could not check video result: ${message}`))
         }
       } finally {
         if (!options?.silent) setIsVideoTaskRefreshing(false)
@@ -965,7 +1073,7 @@ function App() {
     async (taskId?: string) => {
       if (!taskId) return
       setIsVideoDownloading(true)
-      setVideoTaskMessage('正在保存平台视频到本地...')
+      setVideoTaskMessage(tr('正在保存平台视频到本地...', 'Saving provider video locally...'))
 
       try {
         const response = await fetch('/api/video-task-download', {
@@ -977,24 +1085,24 @@ function App() {
         if (!response.ok || data.error || !data.task) throw new Error(data.error || '保存视频失败')
 
         updateVideoTaskSummary(data.task)
-        setVideoTaskMessage('视频已保存到本地，可以直接预览或下载')
-        setStatus('视频已保存到本地，可以直接预览或下载')
+        setVideoTaskMessage(tr('视频已保存到本地，可以直接预览或下载', 'Video saved locally. You can preview or download it now.'))
+        setStatus(tr('视频已保存到本地，可以直接预览或下载', 'Video saved locally. You can preview or download it now.'))
       } catch (error) {
-        const message = error instanceof Error ? error.message : '保存视频失败'
+        const message = error instanceof Error ? localizeKnownMessage(error.message, language) : tr('保存视频失败', 'Could not save video')
         setVideoTaskMessage(message)
-        setStatus(`保存视频失败：${message}`)
+        setStatus(tr(`保存视频失败：${message}`, `Could not save video: ${message}`))
       } finally {
         setIsVideoDownloading(false)
       }
     },
-    [updateVideoTaskSummary],
+    [language, tr, updateVideoTaskSummary],
   )
 
   const saveVideoTaskToDownloads = useCallback(
     async (taskId?: string) => {
       if (!taskId) return
       setIsSavingVideoToDownloads(true)
-      setVideoTaskMessage('正在保存视频到下载目录...')
+      setVideoTaskMessage(tr('正在保存视频到下载目录...', 'Saving video to Downloads...'))
 
       try {
         let taskForDownloads = videoTasks.find((task) => task.id === taskId)
@@ -1020,17 +1128,17 @@ function App() {
 
         updateVideoTaskSummary(data.task)
         const path = data.downloadsVideoPath ?? data.task.downloadsVideoPath ?? '~/Downloads/Cowart Videos'
-        setVideoTaskMessage(`已保存到下载目录：${path}`)
-        setStatus(`已保存视频到下载目录：${path}`)
+        setVideoTaskMessage(tr(`已保存到下载目录：${path}`, `Saved to Downloads: ${path}`))
+        setStatus(tr(`已保存视频到下载目录：${path}`, `Video saved to Downloads: ${path}`))
       } catch (error) {
-        const message = error instanceof Error ? error.message : '保存到下载目录失败'
+        const message = error instanceof Error ? localizeKnownMessage(error.message, language) : tr('保存到下载目录失败', 'Could not save to Downloads')
         setVideoTaskMessage(message)
-        setStatus(`保存到下载目录失败：${message}`)
+        setStatus(tr(`保存到下载目录失败：${message}`, `Could not save to Downloads: ${message}`))
       } finally {
         setIsSavingVideoToDownloads(false)
       }
     },
-    [updateVideoTaskSummary, videoTasks],
+    [language, tr, updateVideoTaskSummary, videoTasks],
   )
 
   const applyVideoConfigResponse = (data: VideoConfigResponse) => {
@@ -1060,7 +1168,7 @@ function App() {
       if (!response.ok || data.error) throw new Error(data.error || '读取 API 设置失败')
       applyVideoConfigResponse(data)
     } catch (error) {
-      setVideoConfigMessage(error instanceof Error ? error.message : '读取 API 设置失败')
+      setVideoConfigMessage(error instanceof Error ? localizeKnownMessage(error.message, language) : tr('读取 API 设置失败', 'Could not read API settings'))
     } finally {
       setIsApiConfigLoading(false)
     }
@@ -1074,7 +1182,7 @@ function App() {
   const saveApiSettings = async () => {
     const provider = selectedVideoConfig
     if (!provider) {
-      setVideoConfigMessage('还没有读到这个平台的设置项')
+      setVideoConfigMessage(tr('还没有读到这个平台的设置项', 'No settings were found for this provider yet'))
       return
     }
 
@@ -1094,7 +1202,7 @@ function App() {
       setVideoConfigMessage(tr(`${providerName} API 设置已保存`, `${providerName} API settings saved`))
       setStatus(tr(`${providerName} API 设置已保存，可以继续生成视频`, `${providerName} API settings saved. You can generate videos now.`))
     } catch (error) {
-      setVideoConfigMessage(error instanceof Error ? error.message : '保存 API 设置失败')
+      setVideoConfigMessage(error instanceof Error ? localizeKnownMessage(error.message, language) : tr('保存 API 设置失败', 'Could not save API settings'))
     } finally {
       setIsApiConfigSaving(false)
     }
@@ -1166,8 +1274,8 @@ function App() {
       }
     }
 
-    const types = Array.from(dataTransfer.types).join(', ') || '无'
-    setStatus(`没有识别到图片。拖拽数据类型：${types}。可以复制图片后按 Cmd+V，或点上传图片。`)
+    const types = Array.from(dataTransfer.types).join(', ') || tr('无', 'none')
+    setStatus(tr(`没有识别到图片。拖拽数据类型：${types}。可以复制图片后按 Cmd+V，或点上传图片。`, `No image was detected. Drag data types: ${types}. Copy the image and press Cmd+V, or click Upload Image.`))
     return false
   }
 
@@ -1200,7 +1308,7 @@ function App() {
   useEffect(() => {
     const describeDrag = (dataTransfer: DataTransfer | null) => {
       const types = Array.from(dataTransfer?.types ?? [])
-      return types.length > 0 ? `检测到拖拽：${types.join(', ')}` : '检测到拖拽，但没有公开数据类型'
+      return types.length > 0 ? tr(`检测到拖拽：${types.join(', ')}`, `Drag detected: ${types.join(', ')}`) : tr('检测到拖拽，但没有公开数据类型', 'Drag detected, but no public data type was exposed.')
     }
 
     const handleNativeDragEnter = (event: DragEvent) => {
@@ -1267,7 +1375,7 @@ function App() {
 
   const pasteFromClipboard = async () => {
     if (!navigator.clipboard?.read) {
-      setStatus('当前浏览器不支持直接读取剪贴板。请复制图片后按 Cmd+V，或用上传图片。')
+      setStatus(tr('当前浏览器不支持直接读取剪贴板。请复制图片后按 Cmd+V，或用上传图片。', 'This browser cannot read the clipboard directly. Copy the image and press Cmd+V, or use Upload Image.'))
       return
     }
 
@@ -1284,9 +1392,9 @@ function App() {
         addImportedFiles(files)
         return
       }
-      setStatus('剪贴板里没有读到图片。可以先复制图片，再点这个按钮或按 Cmd+V。')
+      setStatus(tr('剪贴板里没有读到图片。可以先复制图片，再点这个按钮或按 Cmd+V。', 'No image was found in the clipboard. Copy an image first, then click this button or press Cmd+V.'))
     } catch {
-      setStatus('读取剪贴板被浏览器拦截。请按 Cmd+V 粘贴，或点上传图片。')
+      setStatus(tr('读取剪贴板被浏览器拦截。请按 Cmd+V 粘贴，或点上传图片。', 'The browser blocked clipboard reading. Press Cmd+V to paste, or click Upload Image.'))
     }
   }
 
@@ -1332,14 +1440,14 @@ function App() {
       const heightScale = (startHeight + verticalDirection * (moveEvent.clientY - startY)) / activeDimensions.height
       latestScale = clampCanvasScale(Math.max(widthScale, heightScale))
       setCanvasScale(latestScale)
-      setStatus(`拖拽缩放 ${Math.round(latestScale * 100)}%`)
+      setStatus(tr(`拖拽缩放 ${Math.round(latestScale * 100)}%`, `Drag resize ${Math.round(latestScale * 100)}%`))
     }
 
     const stop = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', stop)
       setIsImageScaleDragging(false)
-      setStatus(`图片缩放 ${Math.round(latestScale * 100)}%，可以继续放大局部标注`)
+      setStatus(tr(`图片缩放 ${Math.round(latestScale * 100)}%，可以继续放大局部标注`, `Image zoom ${Math.round(latestScale * 100)}%. You can keep enlarging areas for annotation.`))
     }
 
     window.addEventListener('pointermove', move)
@@ -1501,12 +1609,12 @@ function App() {
       return
     }
 
-    setStatus('没有识别到素材图片。可以先把图片导入左侧，再拖到这个素材槽。')
+    setStatus(tr('没有识别到素材图片。可以先把图片导入左侧，再拖到这个素材槽。', 'No reference image was detected. Import the image on the left first, then drag it into this slot.'))
   }
 
   const exportTask = () => {
     if (!activeImage) {
-      setStatus('还没有图片可以导出')
+      setStatus(tr('还没有图片可以导出', 'There is no image to export yet.'))
       return
     }
     const blob = new Blob(
@@ -1515,7 +1623,7 @@ function App() {
           {
             image: activeImage,
             references: filledCanvasReferences.map((item) => ({
-              label: item.reference.label,
+              label: getReferenceLabel(item.index, language),
               image: item.image,
             })),
             annotations,
@@ -1533,13 +1641,13 @@ function App() {
     link.download = 'cowart-image-edit-task.json'
     link.click()
     URL.revokeObjectURL(url)
-    setStatus('已导出图片修改任务和标注')
+    setStatus(tr('已导出图片修改任务和标注', 'Exported the image edit task and annotations.'))
   }
 
   const resetCanvas = () => {
     if (!activeImage) return
     setAnnotationMap((current) => ({ ...current, [activeImage.id]: [] }))
-    setStatus('已清空当前图片的画布标注')
+    setStatus(tr('已清空当前图片的画布标注', 'Cleared the canvas annotations for the current image.'))
   }
 
   const removeReferenceCanvasSlot = (slotIndex: number) => {
@@ -1549,9 +1657,9 @@ function App() {
       const compacted = [...visible, ...hidden].slice(0, maxCanvasReferenceImages)
       while (compacted.length < maxCanvasReferenceImages) {
         const index = compacted.length
-        compacted.push({ id: `reference-${index + 1}`, label: `素材 ${index + 1}` })
+        compacted.push(createCanvasReference(index))
       }
-      return compacted.map((reference, index) => ({ ...reference, id: `reference-${index + 1}`, label: `素材 ${index + 1}` }))
+      return compacted.map((reference, index) => ({ ...reference, id: `reference-${index + 1}`, label: `reference-${index + 1}` }))
     })
     setReferenceSlotSizes((current) => {
       const visible = current.slice(0, referenceSlotCount).filter((_, index) => index !== slotIndex)
@@ -1561,7 +1669,7 @@ function App() {
       return compacted
     })
     setReferenceSlotCount((current) => Math.max(0, current - 1))
-    setStatus(`已删除第 ${slotIndex + 1} 个扩展画布`)
+    setStatus(tr(`已删除第 ${slotIndex + 1} 个扩展画布`, `Deleted extra canvas slot ${slotIndex + 1}.`))
   }
 
   const startReferenceSlotResize = (event: ReactPointerEvent<HTMLButtonElement>, slotIndex: number) => {
@@ -1578,13 +1686,13 @@ function App() {
       const delta = Math.max(moveEvent.clientX - startX, moveEvent.clientY - startY)
       latestSize = clampReferenceSlotSize(startSize + delta)
       setReferenceSlotSizes((current) => current.map((size, index) => (index === slotIndex ? latestSize : size)))
-      setStatus(`第 ${slotIndex + 1} 个扩展画布 ${latestSize}px`)
+      setStatus(tr(`第 ${slotIndex + 1} 个扩展画布 ${latestSize}px`, `Extra canvas slot ${slotIndex + 1}: ${latestSize}px`))
     }
 
     const stop = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', stop)
-      setStatus(`已调整第 ${slotIndex + 1} 个扩展画布大小：${latestSize}px`)
+      setStatus(tr(`已调整第 ${slotIndex + 1} 个扩展画布大小：${latestSize}px`, `Resized extra canvas slot ${slotIndex + 1}: ${latestSize}px`))
     }
 
     window.addEventListener('pointermove', move)
@@ -1593,16 +1701,16 @@ function App() {
 
   const sendEditTask = async () => {
     if (!activeImage) {
-      setStatus('先放入一张要修改的图片')
+      setStatus(tr('先放入一张要修改的图片', 'Place an image to edit first.'))
       return
     }
     if (annotations.length === 0 && filledCanvasReferences.length === 0) {
-      setStatus('还没有画布标注或参考素材，先标出要改的地方，或把素材图放到下方槽里')
+      setStatus(tr('还没有画布标注或参考素材，先标出要改的地方，或把素材图放到下方槽里', 'No canvas annotations or reference materials yet. Mark the areas to edit, or drop reference images into the slots below.'))
       return
     }
 
     try {
-      setStatus('正在保存主图、参考素材和标注，准备交给 Codex 生成...')
+      setStatus(tr('正在保存主图、参考素材和标注，准备交给 Codex 生成...', 'Saving the main image, references, and annotations for Codex...'))
       const imageResponse = await fetch(activeImage.src)
       if (!imageResponse.ok) throw new Error('读不到当前原图')
       const imageBlob = await imageResponse.blob()
@@ -1623,7 +1731,7 @@ function App() {
         body: JSON.stringify({
           image: activeImage,
           references: filledCanvasReferences.map((item) => ({
-            label: item.reference.label,
+            label: getReferenceLabel(item.index, language),
             image: item.image,
           })),
           annotations,
@@ -1637,12 +1745,13 @@ function App() {
 
       try {
         await navigator.clipboard.writeText(task.codexInstruction)
-        setStatus(`已保存任务并复制给 Codex 的生成指令。把剪贴板内容粘贴到左边聊天，我就能按标注和 ${filledCanvasReferences.length} 张素材重新生成。`)
+        setStatus(tr(`已保存任务并复制给 Codex 的生成指令。把剪贴板内容粘贴到左边聊天，我就能按标注和 ${filledCanvasReferences.length} 张素材重新生成。`, `Saved the task and copied the Codex instruction. Paste the clipboard into the chat on the left, and I can regenerate from the annotations and ${filledCanvasReferences.length} reference image${filledCanvasReferences.length > 1 ? 's' : ''}.`))
       } catch {
-        setStatus(`已保存任务，但浏览器没允许复制。生成指令在：${task.codexInstructionPath}`)
+        setStatus(tr(`已保存任务，但浏览器没允许复制。生成指令在：${task.codexInstructionPath}`, `Saved the task, but the browser did not allow copying. The generation instruction is at: ${task.codexInstructionPath}`))
       }
     } catch (error) {
-      setStatus(error instanceof Error ? `交给 Codex 失败：${error.message}` : '交给 Codex 失败')
+      const message = error instanceof Error ? localizeKnownMessage(error.message, language) : ''
+      setStatus(message ? tr(`交给 Codex 失败：${message}`, `Could not send to Codex: ${message}`) : tr('交给 Codex 失败', 'Could not send to Codex'))
     }
   }
 
@@ -1652,8 +1761,8 @@ function App() {
     const inputImages = selectedVideoImages.length > 0 ? selectedVideoImages : activeImage ? [activeImage] : []
 
     if (inputImages.length === 0) {
-      setStatus('先上传或选择 1 到 5 张图片，作为视频首帧和参考图')
-      setVideoTaskMessage('还没有选择视频参考图。')
+      setStatus(tr('先上传或选择 1 到 5 张图片，作为视频首帧和参考图', 'Upload or select 1 to 5 images first for the first frame and references.'))
+      setVideoTaskMessage(tr('还没有选择视频参考图。', 'No video reference images selected yet.'))
       return
     }
 
@@ -1662,12 +1771,12 @@ function App() {
       videoPrompt.trim() ||
       prompt.trim() ||
       (limitedImages.length > 1
-        ? `以这 ${limitedImages.length} 张图片作为首帧和参考图，生成自然、有镜头运动的视频：${limitedImages.map((image) => image.title).join('、')}`
-        : `以这张图片作为首帧，生成自然、有镜头运动的视频：${limitedImages[0]?.title ?? '参考图'}`)
+        ? tr(`以这 ${limitedImages.length} 张图片作为首帧和参考图，生成自然、有镜头运动的视频：${limitedImages.map((image) => image.title).join('、')}`, `Use these ${limitedImages.length} images as the first frame and references to generate a natural video with camera movement: ${limitedImages.map((image) => image.title).join(', ')}`)
+        : tr(`以这张图片作为首帧，生成自然、有镜头运动的视频：${limitedImages[0]?.title ?? '参考图'}`, `Use this image as the first frame to generate a natural video with camera movement: ${limitedImages[0]?.title ?? 'reference image'}`))
 
     try {
       setIsVideoSubmitting(true)
-      setStatus(`正在保存 ${limitedImages.length} 张视频参考图并创建任务...`)
+      setStatus(tr(`正在保存 ${limitedImages.length} 张视频参考图并创建任务...`, `Saving ${limitedImages.length} video reference image${limitedImages.length > 1 ? 's' : ''} and creating the task...`))
       const imageDataUrls = await Promise.all(
         limitedImages.map(async (image) => {
           const imageResponse = await fetch(image.src)
@@ -1697,23 +1806,25 @@ function App() {
       if (!response.ok || task.error) throw new Error(task.error || '创建视频任务失败')
 
       if (task.status === 'needs_config') {
-        const missing = task.missingEnv?.join('、') || '视频平台密钥'
-        const message = `已保存视频任务，但还没提交到 ${task.providerName ?? '视频平台'}：缺少 ${missing}`
-        setVideoTaskMessage(`${message}\n任务目录：${task.directory}`)
+        const missing = task.missingEnv?.join(language === 'en' ? ', ' : '、') || tr('视频平台密钥', 'video provider key')
+        const providerName = getVideoProviderText(task.provider, language, task.providerName) ?? tr('视频平台', 'video provider')
+        const message = tr(`已保存视频任务，但还没提交到 ${providerName}：缺少 ${missing}`, `Video task saved, but it was not submitted to ${providerName}: missing ${missing}`)
+        setVideoTaskMessage(`${message}\n${tr(`任务目录：${task.directory}`, `Task folder: ${task.directory}`)}`)
         setStatus(message)
         void loadVideoTasks(true)
         return
       }
 
-      const taskId = task.providerTaskId ? `，任务 ID：${task.providerTaskId}` : ''
-      const message = `已提交到 ${task.providerName ?? '视频平台'}${taskId}`
-      setVideoTaskMessage(`${message}\n任务目录：${task.directory}`)
-      setStatus(`${message}。结果会显示在右侧视频结果里`)
+      const providerName = getVideoProviderText(task.provider, language, task.providerName) ?? tr('视频平台', 'video provider')
+      const taskId = task.providerTaskId ? tr(`，任务 ID：${task.providerTaskId}`, `, task ID: ${task.providerTaskId}`) : ''
+      const message = tr(`已提交到 ${providerName}${taskId}`, `Submitted to ${providerName}${taskId}`)
+      setVideoTaskMessage(`${message}\n${tr(`任务目录：${task.directory}`, `Task folder: ${task.directory}`)}`)
+      setStatus(tr(`${message}。结果会显示在右侧视频结果里`, `${message}. Results will appear in the video results panel on the right.`))
       void loadVideoTasks(true)
     } catch (error) {
-      const message = error instanceof Error ? error.message : '创建视频任务失败'
+      const message = error instanceof Error ? localizeKnownMessage(error.message, language) : tr('创建视频任务失败', 'Could not create the video task')
       setVideoTaskMessage(message)
-      setStatus(`生成视频失败：${message}`)
+      setStatus(tr(`生成视频失败：${message}`, `Video generation failed: ${message}`))
       void loadVideoTasks(true)
     } finally {
       setIsVideoSubmitting(false)
@@ -1910,7 +2021,7 @@ function App() {
                     {selectedVideoConfig.fields.map((field) => (
                       <label key={field.key} className="api-field">
                         <span>
-                          {field.label}
+                          {getVideoConfigFieldLabel(field, language)}
                           {field.secret && field.configured ? <small>{tr('已保存', 'Saved')}</small> : null}
                         </span>
                         <input
@@ -1926,7 +2037,7 @@ function App() {
                 ) : (
                   <p className="recent-empty">{tr('还没有读到这个平台的设置项。', 'No settings were found for this provider yet.')}</p>
                 )}
-                {videoConfigMessage ? <p className="config-message">{videoConfigMessage}</p> : null}
+                {videoConfigMessage ? <p className="config-message">{displayVideoConfigMessage}</p> : null}
                 <button type="button" className="secondary-button wide-button" onClick={() => void saveApiSettings()} disabled={isApiConfigSaving || !selectedVideoConfig}>
                   {isApiConfigSaving ? tr('正在保存...', 'Saving...') : tr('保存 API 设置', 'Save API Settings')}
                 </button>
@@ -1974,7 +2085,7 @@ function App() {
                 </select>
               </label>
             </div>
-            {videoTaskMessage ? <pre className="video-task-message">{videoTaskMessage}</pre> : null}
+            {videoTaskMessage ? <pre className="video-task-message">{displayVideoTaskMessage}</pre> : null}
             <button type="button" className="primary-button" onClick={() => void submitVideoTask()} disabled={isVideoSubmitting}>
               <Video size={16} />
               {isVideoSubmitting ? tr('正在创建视频任务...', 'Creating video task...') : tr('用这张图生成视频', 'Generate Video')}
@@ -2271,10 +2382,11 @@ function App() {
                       ) : null}
                       <h2>{activeVideoTask.title}</h2>
                       <p>{getVideoTaskDetailText(activeVideoTask, language) || tr('视频任务', 'Video task')}</p>
-                      {activeVideoTask.prompt ? <small>{activeVideoTask.prompt}</small> : null}
+                      {activeVideoTask.prompt ? <small>{getDisplayPromptText(activeVideoTask.prompt, language)}</small> : null}
                       {activeVideoTask.missingEnv && activeVideoTask.missingEnv.length > 0 ? <em>{tr(`缺少 API：${activeVideoTask.missingEnv.join('、')}`, `Missing API: ${activeVideoTask.missingEnv.join(', ')}`)}</em> : null}
                       {activeVideoTask.taskId ? <em>{tr(`任务 ID：${activeVideoTask.taskId}`, `Task ID: ${activeVideoTask.taskId}`)}</em> : null}
                       {activeVideoTask.providerTaskStatus && !activeVideoTaskIsGenerating ? <em>{tr(`平台状态：${activeVideoTask.providerTaskStatus}`, `Provider status: ${activeVideoTask.providerTaskStatus}`)}</em> : null}
+                      {activeVideoTask.providerError ? <em>{tr(`平台错误：${activeVideoTask.providerError}`, `Provider error: ${activeVideoTask.providerError}`)}</em> : null}
                       <span>{tr(`提交：${formatTaskTime(activeVideoTask.createdAt, language)}`, `Submitted: ${formatTaskTime(activeVideoTask.createdAt, language)}`)}</span>
                       {activeVideoTask.updatedAt ? <span>{tr(`更新：${formatTaskTime(activeVideoTask.updatedAt, language)}`, `Updated: ${formatTaskTime(activeVideoTask.updatedAt, language)}`)}</span> : null}
                       {activeVideoTask.downloadsVideoPath ? <em>{tr(`下载目录：${activeVideoTask.downloadsVideoPath}`, `Downloads folder: ${activeVideoTask.downloadsVideoPath}`)}</em> : null}
@@ -2334,6 +2446,8 @@ function App() {
                               </span>
                             ) : task.providerTaskStatus ? (
                               <span>{tr(`平台状态：${task.providerTaskStatus}`, `Provider status: ${task.providerTaskStatus}`)}</span>
+                            ) : task.providerError ? (
+                              <span>{tr(`平台错误：${task.providerError}`, `Provider error: ${task.providerError}`)}</span>
                             ) : null}
                             <small className={`video-status video-status-${task.status}`}>{getVideoStatusLabel(task.status)}</small>
                           </div>
@@ -2516,6 +2630,7 @@ function App() {
                   <div className="reference-slots" style={referenceSlotsStyle}>
                     {visibleCanvasReferences.map((reference, index) => {
                       const referenceImage = reference.imageId ? images.find((image) => image.id === reference.imageId) : undefined
+                      const referenceLabel = getReferenceLabel(index, language)
                       return (
                         <div
                           key={reference.id}
@@ -2528,28 +2643,28 @@ function App() {
                           onDrop={(event) => handleReferenceSlotDrop(event, index)}
                           style={{ '--reference-slot-size': `${referenceSlotSizes[index] ?? defaultReferenceSlotSize}px` } as CSSProperties}
                         >
-                          <button type="button" className="reference-slot-delete" aria-label={tr(`删除 ${reference.label}`, `Delete ${reference.label}`)} onClick={() => removeReferenceCanvasSlot(index)}>
+                          <button type="button" className="reference-slot-delete" aria-label={tr(`删除 ${getReferenceLabel(index, 'zh')}`, `Delete ${referenceLabel}`)} onClick={() => removeReferenceCanvasSlot(index)}>
                             <Trash2 size={13} />
                           </button>
                           {referenceImage ? (
                             <>
                               <img src={referenceImage.src} alt={referenceImage.title} draggable={false} />
                               <span>{referenceImage.title}</span>
-                              <button type="button" className="reference-slot-clear" aria-label={tr(`移除 ${reference.label} 图片`, `Remove image from ${reference.label}`)} onClick={() => setCanvasReferences((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, imageId: undefined } : item)))}>
+                              <button type="button" className="reference-slot-clear" aria-label={tr(`移除 ${getReferenceLabel(index, 'zh')} 图片`, `Remove image from ${referenceLabel}`)} onClick={() => setCanvasReferences((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, imageId: undefined } : item)))}>
                                 <Trash2 size={13} />
                               </button>
                             </>
                           ) : (
                             <>
                               <ImagePlus size={22} />
-                              <strong>{tr(reference.label, `Reference ${index + 1}`)}</strong>
+                              <strong>{referenceLabel}</strong>
                               <span>{tr('拖入任意参考图', 'Drop any reference image')}</span>
                             </>
                           )}
                           <button
                             type="button"
                             className="reference-slot-resize"
-                            aria-label={tr(`调整 ${reference.label} 大小`, `Resize ${reference.label}`)}
+                            aria-label={tr(`调整 ${getReferenceLabel(index, 'zh')} 大小`, `Resize ${referenceLabel}`)}
                             title={tr('拖拽调整画布大小', 'Drag to resize canvas')}
                             onPointerDown={(event) => startReferenceSlotResize(event, index)}
                           />
