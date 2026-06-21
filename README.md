@@ -2,7 +2,31 @@
 
 Cowart Canvas is a local browser canvas for marking exactly where an AI image should be edited, then turning those visual notes into a Codex-ready request. It also includes a local image-to-video task panel with front-end API settings and video history.
 
+The interface is bilingual: Chinese and English are both built in, and users can switch languages from the top-left toolbar.
+
 The app runs on your own machine. Imported images, generated task files, video task files, and API keys stay local unless you send them to a provider yourself.
+
+## Screenshots
+
+### Edit Canvas
+
+![Edit canvas empty state](docs/screenshots/01-edit-canvas-empty.png)
+
+### Image To Video
+
+![Image-to-video result history](docs/screenshots/02-video-results-panel.png)
+
+### Reference Canvases And Annotations
+
+![Reference canvases and resizable annotation notes](docs/screenshots/03-reference-canvas-annotation.png)
+
+### Codex Handoff Workflow
+
+![Annotated edit request prepared for Codex](docs/screenshots/04-codex-handoff-workflow.png)
+
+### Video Workflow
+
+![Video workflow with provider history](docs/screenshots/05-video-workflow-wide.png)
 
 ## Features
 
@@ -15,7 +39,7 @@ The app runs on your own machine. Imported images, generated task files, video t
 - Choose annotation color, shape style, and S/M/L/XL defaults.
 - Add up to three extra reference canvases below the main image for product/object/style references.
 - Read all canvas notes into a structured Codex edit prompt.
-- Switch the interface between Chinese and English.
+- Switch the full interface between Chinese and English.
 - Create image-to-video tasks from 1 to 5 reference images.
 - Configure video provider API keys in the front-end settings panel or `.env.local`.
 - View video task history in the right-side canvas area.
@@ -32,7 +56,7 @@ macOS is recommended for the background service scripts, but the dev server itse
 ## Quick Start
 
 ```bash
-git clone https://github.com/aaronsun0811-dot/cowart-canvas.git
+git clone https://github.com/yukunai/cowart-canvas.git
 cd cowart-canvas
 npm install
 npm run dev
