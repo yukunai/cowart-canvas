@@ -170,6 +170,7 @@ const defaultArkVideoModel = 'doubao-seedance-2-0-260128'
 const defaultArkImageModel = 'doubao-seedream-4-0-250828'
 const defaultFalImageModel = 'fal-ai/flux-pro/kontext/max/multi'
 const defaultDashScopeImageModel = 'wan2.7-image-pro'
+const defaultKlingImageModel = 'kling-image-o1'
 
 const videoConfigFields: Record<VideoProvider, VideoConfigField[]> = {
   kling: [
@@ -230,8 +231,8 @@ const imageConfigFields: Record<ImageProvider, VideoConfigField[]> = {
   kling: [
     { key: 'KLING_ACCESS_KEY', label: 'Access Key', secret: true },
     { key: 'KLING_SECRET_KEY', label: 'Secret Key', secret: true },
-    { key: 'KLING_IMAGE_MODEL', label: '图片模型', placeholder: 'kling-image-v1' },
-    { key: 'KLING_IMAGE_ENDPOINT', label: '图片接口地址', placeholder: 'https://api.klingai.com/v1/images/generations' },
+    { key: 'KLING_IMAGE_MODEL', label: '图片模型', placeholder: defaultKlingImageModel },
+    { key: 'KLING_IMAGE_ENDPOINT', label: '图片接口地址', placeholder: 'https://api-singapore.klingai.com/v1/images/generations' },
   ],
 }
 
@@ -1171,16 +1172,18 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
     return {
       providerName,
       missingEnv,
-      endpoint: process.env.KLING_IMAGE_ENDPOINT || `${process.env.KLING_BASE_URL || 'https://api.klingai.com'}/v1/images/generations`,
+      endpoint: process.env.KLING_IMAGE_ENDPOINT || `${process.env.KLING_BASE_URL || 'https://api-singapore.klingai.com'}/v1/images/generations`,
       headers: {
         Authorization: `Bearer ${createKlingToken(accessKey, secretKey)}`,
         'Content-Type': 'application/json',
       },
       body: {
-        model_name: process.env.KLING_IMAGE_MODEL || 'kling-image-v1',
+        model_name: process.env.KLING_IMAGE_MODEL || defaultKlingImageModel,
         prompt,
         image: image.base64,
-        reference_images: references.map((reference) => reference.base64),
+        image_reference: references[0]?.base64,
+        n: 1,
+        aspect_ratio: '16:9',
       },
     }
   }
@@ -1261,6 +1264,33 @@ async function pollDashScopeImageTask(taskId: string) {
     if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 3000))
     latest = await getProviderJson(buildDashScopeImageTaskEndpoint(taskId), {
       Authorization: `Bearer ${apiKey}`,
+    })
+
+    const status = extractProviderTaskStatus(latest.payload)
+    const hasImage = extractImageUrl(latest.payload) || extractImageBase64(latest.payload)
+    if (hasImage || isProviderFailureStatus(status)) break
+  }
+
+  return latest
+}
+
+function buildKlingImageTaskEndpoint(createEndpoint: string, taskId: string) {
+  const explicitEndpoint = process.env.KLING_IMAGE_TASK_ENDPOINT || process.env.KLING_TASK_ENDPOINT
+  if (explicitEndpoint) return explicitEndpoint.replace(/\{task_id\}|\{taskId\}/g, encodeURIComponent(taskId))
+
+  return `${createEndpoint.replace(/\/+$/, '')}/${encodeURIComponent(taskId)}`
+}
+
+async function pollKlingImageTask(createEndpoint: string, taskId: string) {
+  const accessKey = process.env.KLING_ACCESS_KEY
+  const secretKey = process.env.KLING_SECRET_KEY
+  if (!accessKey || !secretKey) return null
+
+  let latest: Awaited<ReturnType<typeof getProviderJson>> | null = null
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 3000))
+    latest = await getProviderJson(buildKlingImageTaskEndpoint(createEndpoint, taskId), {
+      Authorization: `Bearer ${createKlingToken(accessKey, secretKey)}`,
     })
 
     const status = extractProviderTaskStatus(latest.payload)
@@ -2064,6 +2094,13 @@ function localImageImportPlugin(): PluginOption {
           const initialTaskId = extractProviderTaskId(providerResponse.payload)
           if (provider === 'wanxiang' && providerResponse.ok && !savedOutput.resultImagePath && initialTaskId) {
             const polledResponse = await pollDashScopeImageTask(initialTaskId)
+            if (polledResponse) {
+              finalProviderResponse = polledResponse
+              savedOutput = polledResponse.ok ? await saveProviderImageOutput(directory, polledResponse.payload) : savedOutput
+            }
+          }
+          if (provider === 'kling' && providerResponse.ok && !savedOutput.resultImagePath && initialTaskId) {
+            const polledResponse = await pollKlingImageTask(providerRequest.endpoint, initialTaskId)
             if (polledResponse) {
               finalProviderResponse = polledResponse
               savedOutput = polledResponse.ok ? await saveProviderImageOutput(directory, polledResponse.payload) : savedOutput
