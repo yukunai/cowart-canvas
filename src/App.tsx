@@ -121,9 +121,9 @@ type ImageTaskResponse = {
 
 const maxVideoImages = 5
 const maxCanvasReferenceImages = 3
-const defaultReferenceSlotSize = 88
-const minReferenceSlotSize = 72
-const maxReferenceSlotSize = 150
+const defaultReferenceSlotSize = 64
+const minReferenceSlotSize = 52
+const maxReferenceSlotSize = 110
 const imageAspectRatioOptions = ['adaptive', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3']
 
 type ImageResizeCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'

@@ -1297,12 +1297,12 @@ textarea {
   width: max-content;
   min-width: min(100%, 260px);
   justify-items: center;
-  gap: 18px;
+  gap: 14px;
   padding: 18px;
 }
 
 .composition-canvas.has-reference-slots {
-  padding-bottom: 24px;
+  padding-bottom: 18px;
 }
 
 .reference-slots {
@@ -1310,25 +1310,25 @@ textarea {
   align-items: flex-start;
   justify-content: center;
   flex-wrap: nowrap;
-  gap: clamp(8px, 2.4vw, 18px);
+  gap: clamp(6px, 1.8vw, 14px);
   max-width: 100%;
 }
 
 .reference-slot {
   position: relative;
   display: grid;
-  width: var(--reference-slot-size, 88px);
-  min-width: var(--reference-slot-size, 88px);
+  width: var(--reference-slot-size, 64px);
+  min-width: var(--reference-slot-size, 64px);
   aspect-ratio: 1;
   place-items: center;
   overflow: hidden;
   border: 1px solid rgba(100, 116, 139, 0.58);
-  border-radius: 9px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.58);
   color: #647587;
   cursor: pointer;
   text-align: center;
-  padding: 7px;
+  padding: 5px;
 }
 
 .reference-slot:focus-visible {
@@ -1339,7 +1339,7 @@ textarea {
 .reference-slot.filled {
   border-color: rgba(45, 65, 95, 0.72);
   background: #ffffff;
-  box-shadow: 0 8px 20px rgba(20, 31, 44, 0.1);
+  box-shadow: 0 5px 14px rgba(20, 31, 44, 0.09);
 }
 
 .reference-slot > img {
@@ -1352,7 +1352,7 @@ textarea {
   max-width: 100%;
   overflow: hidden;
   color: #2c3a49;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1365,39 +1365,39 @@ textarea {
   left: 4px;
   border-radius: 5px;
   background: rgba(255, 255, 255, 0.86);
-  padding: 2px 4px;
+  padding: 1px 3px;
 }
 
 .reference-slot > strong {
   color: #314255;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .reference-slot-badge {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  max-width: calc(100% - 34px);
+  top: 3px;
+  left: 3px;
+  max-width: calc(100% - 28px);
   overflow: hidden;
-  border-radius: 5px;
+  border-radius: 4px;
   background: rgba(17, 24, 39, 0.68);
   color: #fff !important;
-  font-size: 9px !important;
+  font-size: 8px !important;
   font-weight: 760;
   line-height: 1;
-  padding: 3px 5px;
+  padding: 2px 4px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .reference-slot-title {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  left: 4px;
-  border-radius: 5px;
+  right: 3px;
+  bottom: 3px;
+  left: 3px;
+  border-radius: 4px;
   background: rgba(255, 255, 255, 0.86);
-  padding: 2px 4px;
+  padding: 1px 3px;
   transition: opacity 120ms ease;
 }
 
@@ -1408,14 +1408,14 @@ textarea {
 
 .reference-slot-delete {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 3px;
+  right: 3px;
   display: grid;
-  width: 22px;
-  height: 22px;
-  min-height: 22px;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
   place-items: center;
-  border-radius: 7px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.92);
   opacity: 0.58;
   padding: 0;
@@ -1429,12 +1429,12 @@ textarea {
 
 .reference-slot-actions {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  left: 4px;
+  right: 3px;
+  bottom: 3px;
+  left: 3px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3px;
+  gap: 2px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease;
@@ -1448,14 +1448,14 @@ textarea {
 
 .reference-slot-actions button {
   min-width: 0;
-  min-height: 22px;
+  min-height: 18px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 4px;
   background: rgba(220, 38, 38, 0.92);
   color: #fff;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
-  padding: 0 3px;
+  padding: 0 2px;
 }
 
 .reference-slot-actions button:last-child {
@@ -1464,18 +1464,18 @@ textarea {
 
 .reference-slot-resize {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
+  right: 3px;
+  bottom: 3px;
   display: grid;
-  width: 18px;
-  height: 18px;
-  min-height: 18px;
+  width: 14px;
+  height: 14px;
+  min-height: 14px;
   place-items: center;
   border: 1px solid rgba(75, 85, 99, 0.45);
-  border-radius: 5px;
+  border-radius: 4px;
   background: rgba(255, 255, 255, 0.72);
   cursor: nwse-resize;
-  opacity: 0.22;
+  opacity: 0.16;
   padding: 0;
   transition:
     opacity 140ms ease,
@@ -1491,10 +1491,10 @@ textarea {
 }
 
 .reference-slot-resize::before {
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid #64748b;
-  border-bottom: 2px solid #64748b;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid #64748b;
+  border-bottom: 1.5px solid #64748b;
   content: '';
 }
 
@@ -1504,19 +1504,19 @@ textarea {
   align-content: center;
   justify-content: center;
   justify-items: center;
-  gap: 5px;
-  width: var(--reference-slot-size, 88px);
-  min-width: var(--reference-slot-size, 88px);
+  gap: 4px;
+  width: var(--reference-slot-size, 64px);
+  min-width: var(--reference-slot-size, 64px);
   aspect-ratio: 1;
   min-height: 0;
   border-style: dashed;
   border-color: #aebbd0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.72);
   color: #3a4a5c;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 760;
-  padding: 7px;
+  padding: 5px;
 }
 
 .canvas-toolbox {
