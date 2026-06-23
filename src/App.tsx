@@ -125,6 +125,54 @@ const defaultReferenceSlotSize = 64
 const minReferenceSlotSize = 52
 const maxReferenceSlotSize = 110
 const imageAspectRatioOptions = ['adaptive', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3']
+const imageGenerationSkills = [
+  {
+    id: 'strict-local-edit',
+    labelZh: '严格局部修补',
+    labelEn: 'Strict Local Edit',
+    descriptionZh: '只改标注和提示词明确要求的位置，尽量保持其它区域不变。',
+    descriptionEn: 'Only edit marked or explicitly requested areas, keeping everything else as unchanged as possible.',
+    promptZh: '严格局部修补模式。以底图作为基础图，只修改用户明确要求的位置；未提到的区域、构图、光线、材质、镜头距离和整体质感尽量保持不变。',
+    promptEn: 'Strict local inpainting mode. Use the source image as the base and only change explicitly requested areas; keep composition, lighting, material, camera distance, and overall quality unchanged elsewhere.',
+  },
+  {
+    id: 'portrait-identity',
+    labelZh: '人物一致性',
+    labelEn: 'Portrait Identity',
+    descriptionZh: '真人/人物改图优先保持同一身份、脸型和五官比例。',
+    descriptionEn: 'For people, preserve identity, face shape, and facial proportions first.',
+    promptZh: '人物一致性优先。必须保持同一人物身份、脸型轮廓、头型、下巴、颧骨、鼻型、嘴型、发际线、肤色、五官比例和表情；不要美化、不要换脸。',
+    promptEn: 'Identity consistency first. Preserve the same person, face outline, head shape, jaw, cheekbones, nose, mouth, hairline, skin tone, facial proportions, and expression. Do not beautify or swap the face.',
+  },
+  {
+    id: 'reference-fusion',
+    labelZh: '参考图自然融合',
+    labelEn: 'Reference Fusion',
+    descriptionZh: '把参考图作为产品、物件、局部元素或风格参考自然融合。',
+    descriptionEn: 'Blend reference images naturally as products, objects, local elements, or style references.',
+    promptZh: '参考图只作为产品、物件、局部元素或风格参考。把参考图自然融合进底图场景，保持透视、光线、阴影、材质和景深一致；不要机械拼贴，不要替换主图主体。',
+    promptEn: 'Use reference images only as products, objects, local elements, or style references. Blend them naturally into the source scene with matching perspective, lighting, shadow, material, and depth of field. Do not collage mechanically or replace the main subject.',
+  },
+  {
+    id: 'style-reference',
+    labelZh: '风格参考',
+    labelEn: 'Style Reference',
+    descriptionZh: '只借鉴参考图的色调、摄影、材质或设计风格。',
+    descriptionEn: 'Use references for color, photography, material, or design style only.',
+    promptZh: '参考图主要用于风格参考，只借鉴色调、材质质感、构图语言、摄影光线或设计风格。主体内容仍以底图和用户要求为准。',
+    promptEn: 'Use references mainly for style: color, material feel, composition language, photographic lighting, or design style. Keep the source image and user request as the content source of truth.',
+  },
+  {
+    id: 'product-commercial',
+    labelZh: '商业产品图',
+    labelEn: 'Commercial Product',
+    descriptionZh: '适合电商、广告、产品融合，强调真实、干净、可展示。',
+    descriptionEn: 'For ecommerce, advertising, and product fusion; clean, realistic, and presentable.',
+    promptZh: '商业产品图模式。结果应干净、真实、可展示，产品或参考元素要有合理比例、接触阴影、材质细节和统一光线，整体像高质量商业摄影或电商广告图。',
+    promptEn: 'Commercial product image mode. The result should be clean, realistic, and presentable, with proper product scale, contact shadows, material detail, and unified lighting like high-quality commercial photography or ecommerce advertising.',
+  },
+] as const
+type ImageGenerationSkillId = (typeof imageGenerationSkills)[number]['id']
 
 type ImageResizeCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
@@ -746,6 +794,7 @@ function App() {
     () => Array.from({ length: maxCanvasReferenceImages }, (_, index) => createCanvasReference(index)),
   )
   const [referenceSlotSizes, setReferenceSlotSizes] = useState<number[]>(() => Array.from({ length: maxCanvasReferenceImages }, () => defaultReferenceSlotSize))
+  const [imageSkillId, setImageSkillId] = useState<ImageGenerationSkillId>('strict-local-edit')
   const [prompt, setPrompt] = useState('')
   const [imageNegativePrompt, setImageNegativePrompt] = useState('')
   const [panelWidth, setPanelWidth] = useState(380)
@@ -966,13 +1015,18 @@ function App() {
 
   const editPrompt = useMemo(() => {
     if (!activeImage) return ''
+    const selectedSkill = imageGenerationSkills.find((skill) => skill.id === imageSkillId) ?? imageGenerationSkills[0]
+    const skillText = tr(
+      `生成策略：${selectedSkill.labelZh}\n策略要求：${selectedSkill.promptZh}`,
+      `Generation strategy: ${selectedSkill.labelEn}\nStrategy requirement: ${selectedSkill.promptEn}`,
+    )
     const referenceNotes = filledCanvasReferences
       .map((item, index) => tr(`${index + 1}. ${getReferenceLabel(item.index, 'zh')}：${item.image.title}`, `${index + 1}. ${getReferenceLabel(item.index, 'en')}: ${item.image.title}`))
       .join('\n')
     const extra = prompt.trim() ? tr(`\n补充说明：${prompt.trim()}`, `\nExtra notes: ${prompt.trim()}`) : ''
     const negative = imageNegativePrompt.trim() ? tr(`\n反向提示词：${imageNegativePrompt.trim()}`, `\nNegative prompt: ${imageNegativePrompt.trim()}`) : ''
     if (annotations.length === 0 && filledCanvasReferences.length === 0) {
-      return tr(`请基于这张图片继续改图：${activeImage.title}\n还没有画布标注。${extra}${negative}`, `Continue editing this image: ${activeImage.title}\nNo canvas annotations yet.${extra}${negative}`)
+      return tr(`请基于这张图片继续改图：${activeImage.title}\n${skillText}\n还没有画布标注。${extra}${negative}`, `Continue editing this image: ${activeImage.title}\n${skillText}\nNo canvas annotations yet.${extra}${negative}`)
     }
     const notes = annotations
       .map((item, index) => {
@@ -996,10 +1050,10 @@ function App() {
     const strictEditGuidance = getStrictImageEditGuidance(language, annotations, filledCanvasReferences.length > 0)
     const parameterText = tr(`\n改图参数：\n${strictEditGuidance}`, `\nEdit parameters:\n${strictEditGuidance}`)
     return tr(
-      `请基于这张主图继续改图：${activeImage.title}\n保持主图主体、构图和质感。${parameterText}${referenceText}${extra}${negative}${annotationText}`,
-      `Continue editing this main image: ${activeImage.title}\nKeep the main subject, composition, and texture.${parameterText}${referenceText}${extra}${negative}${annotationText}`,
+      `请基于这张主图继续改图：${activeImage.title}\n保持主图主体、构图和质感。\n${skillText}${parameterText}${referenceText}${extra}${negative}${annotationText}`,
+      `Continue editing this main image: ${activeImage.title}\nKeep the main subject, composition, and texture.\n${skillText}${parameterText}${referenceText}${extra}${negative}${annotationText}`,
     )
-  }, [activeImage, annotations, filledCanvasReferences, imageNegativePrompt, language, prompt, tr])
+  }, [activeImage, annotations, filledCanvasReferences, imageNegativePrompt, imageSkillId, language, prompt, tr])
 
   const importFiles = (fileList: FileList | File[]) => {
     const files = Array.from(fileList).filter((file) => file.type.startsWith('image/'))
@@ -1979,6 +2033,10 @@ function App() {
               image: item.image,
             })),
             annotations,
+            skill: {
+              id: imageSkillId,
+              name: tr(selectedImageSkill.labelZh, selectedImageSkill.labelEn),
+            },
             editPrompt,
             negativePrompt: imageNegativePrompt.trim() || undefined,
           },
@@ -2320,6 +2378,125 @@ function App() {
     return () => window.clearInterval(timer)
   }, [activeVideoTask?.id, activeVideoTaskIsGenerating, isVideoPanelOpen, refreshVideoTaskResult])
 
+  const selectedImageSkill = imageGenerationSkills.find((skill) => skill.id === imageSkillId) ?? imageGenerationSkills[0]
+  const editControlBlock = (
+    <section className="chat-block prompt-control-block">
+      <label className="api-field" htmlFor="image-skill-select">
+        <span>{tr('Skill / 生成策略', 'Skill / Strategy')}</span>
+        <select id="image-skill-select" value={imageSkillId} onChange={(event) => setImageSkillId(event.target.value as ImageGenerationSkillId)}>
+          {imageGenerationSkills.map((skill) => (
+            <option key={skill.id} value={skill.id}>
+              {tr(skill.labelZh, skill.labelEn)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="skill-description">{tr(selectedImageSkill.descriptionZh, selectedImageSkill.descriptionEn)}</p>
+      <label htmlFor="prompt">{tr('提示词 / 补充说明（可选）', 'Prompt / Extra Notes (Optional)')}</label>
+      <textarea
+        id="prompt"
+        value={prompt}
+        onChange={(event) => setPrompt(event.target.value)}
+        placeholder={tr('比如：整体风格别变，只修我标出来的地方', 'Example: keep the overall style, only fix the areas I marked')}
+      />
+      <label htmlFor="image-negative-prompt">{tr('反向提示词（可选）', 'Negative Prompt (Optional)')}</label>
+      <textarea
+        id="image-negative-prompt"
+        value={imageNegativePrompt}
+        onChange={(event) => setImageNegativePrompt(event.target.value)}
+        placeholder={tr('比如：不要换脸、不要改变背景、不要多手指、不要模糊', 'Example: no face swap, no background changes, no extra fingers, no blur')}
+      />
+      <div className="image-api-panel">
+        <div className="video-block-header">
+          <p className="block-title">{tr('图片 API 生成', 'Image API Generation')}</p>
+          <button type="button" className={`config-toggle-button ${isImageApiSettingsOpen ? 'active' : ''}`} onClick={openImageApiSettings}>
+            <SlidersHorizontal size={14} />
+            {tr('API 设置', 'API Settings')}
+          </button>
+        </div>
+        <div className="segmented-row" aria-label={tr('图片供应商', 'Image providers')}>
+          {imageProviders.map((provider) => (
+            <button
+              key={provider.id}
+              type="button"
+              className={imageProvider === provider.id ? 'active' : ''}
+              onClick={() => setImageProvider(provider.id)}
+              title={tr(provider.noteZh, provider.noteEn)}
+            >
+              {tr(provider.labelZh, provider.labelEn)}
+            </button>
+          ))}
+        </div>
+        <label className="api-field" htmlFor="image-aspect-ratio">
+          <span>{tr('生成比例', 'Aspect Ratio')}</span>
+          <select id="image-aspect-ratio" value={imageAspectRatio} onChange={(event) => setImageAspectRatio(event.target.value)}>
+            {imageAspectRatioOptions.map((ratio) => (
+              <option key={ratio} value={ratio}>
+                {ratio === 'adaptive' ? tr('自动 / 沿用底图', 'Auto / Source') : ratio}
+              </option>
+            ))}
+          </select>
+        </label>
+        {isImageApiSettingsOpen ? (
+          <div className="api-settings-panel">
+            <div className="api-settings-title">
+              <strong>
+                {selectedImageConfig
+                  ? tr(
+                      `${getImageProviderText(selectedImageConfig.id, language, selectedImageConfig.name)} 图片 API 设置`,
+                      `${getImageProviderText(selectedImageConfig.id, language, selectedImageConfig.name)} Image API Settings`,
+                    )
+                  : tr('图片 API 设置', 'Image API Settings')}
+              </strong>
+              <button type="button" onClick={() => void loadImageConfig()} disabled={isImageApiConfigLoading}>
+                <RefreshCcw size={13} />
+                {tr('刷新', 'Refresh')}
+              </button>
+            </div>
+            {isImageApiConfigLoading ? (
+              <p className="recent-empty">{tr('正在读取本地图片 API 设置...', 'Reading local image API settings...')}</p>
+            ) : selectedImageConfig ? (
+              <div className="api-field-list">
+                {selectedImageConfig.fields.map((field) => (
+                  <label key={field.key} className="api-field">
+                    <span>
+                      {getVideoConfigFieldLabel(field, language)}
+                      {field.secret && field.configured ? <small>{tr('已保存', 'Saved')}</small> : null}
+                    </span>
+                    <input
+                      type={field.secret ? 'password' : 'text'}
+                      value={imageConfigValues[field.key] ?? ''}
+                      onChange={(event) => setImageConfigValues((values) => ({ ...values, [field.key]: event.target.value }))}
+                      placeholder={field.secret && field.configured ? tr('已保存，留空不修改', 'Saved. Leave blank to keep it.') : field.placeholder || field.key}
+                      autoComplete="off"
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="recent-empty">{tr('还没有读到这个图片平台的设置项。', 'No settings were found for this image provider yet.')}</p>
+            )}
+            {imageConfigMessage ? <p className="config-message">{displayImageConfigMessage}</p> : null}
+            <button type="button" className="secondary-button wide-button" onClick={() => void saveImageApiSettings()} disabled={isImageApiConfigSaving || !selectedImageConfig}>
+              {isImageApiConfigSaving ? tr('正在保存...', 'Saving...') : tr('保存图片 API 设置', 'Save Image API Settings')}
+            </button>
+          </div>
+        ) : null}
+        {imageApiMessage ? <pre className="video-task-message">{displayImageApiMessage}</pre> : null}
+        <button type="button" className="secondary-button wide-button" onClick={() => void submitImageApiTask()} disabled={isImageApiSubmitting || !activeImage}>
+          <ImagePlus size={16} />
+          {isImageApiSubmitting ? tr('正在调用图片 API...', 'Calling image API...') : tr('用 API 生成/改图', 'Generate/Edit With API')}
+        </button>
+      </div>
+      <p className="block-title">{tr('从画布读到的改图意见', 'Edit Notes Read From Canvas')}</p>
+      <pre className="edit-prompt">{editPrompt || tr('还没有放入图片。', 'No image placed yet.')}</pre>
+      <button type="button" className="primary-button" onClick={() => void sendEditTask()}>
+        <Send size={16} />
+        {tr('交给 Codex 重新生成', 'Send to Codex')}
+      </button>
+    </section>
+  )
+
   return (
     <main
       className="image-edit-app"
@@ -2552,6 +2729,8 @@ function App() {
           </section>
         ) : null}
 
+        {!isVideoPanelOpen ? editControlBlock : null}
+
         <section className="chat-block">
           <div className="button-row">
             <button type="button" className="secondary-button" onClick={() => fileInputRef.current?.click()}>
@@ -2727,112 +2906,6 @@ function App() {
           )}
         </section>
 
-        {!isVideoPanelOpen ? (
-          <section className="chat-block">
-            <label htmlFor="prompt">{tr('补充说明（可选）', 'Extra Notes (Optional)')}</label>
-            <textarea
-              id="prompt"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder={tr('比如：整体风格别变，只修我标出来的地方', 'Example: keep the overall style, only fix the areas I marked')}
-            />
-            <label htmlFor="image-negative-prompt">{tr('反向提示词（可选）', 'Negative Prompt (Optional)')}</label>
-            <textarea
-              id="image-negative-prompt"
-              value={imageNegativePrompt}
-              onChange={(event) => setImageNegativePrompt(event.target.value)}
-              placeholder={tr('比如：不要换脸、不要改变背景、不要多手指、不要模糊', 'Example: no face swap, no background changes, no extra fingers, no blur')}
-            />
-            <p className="block-title">{tr('从画布读到的改图意见', 'Edit Notes Read From Canvas')}</p>
-            <pre className="edit-prompt">{editPrompt || tr('还没有放入图片。', 'No image placed yet.')}</pre>
-            <div className="image-api-panel">
-              <div className="video-block-header">
-                <p className="block-title">{tr('图片 API 生成', 'Image API Generation')}</p>
-                <button type="button" className={`config-toggle-button ${isImageApiSettingsOpen ? 'active' : ''}`} onClick={openImageApiSettings}>
-                  <SlidersHorizontal size={14} />
-                  {tr('API 设置', 'API Settings')}
-                </button>
-              </div>
-              <div className="segmented-row" aria-label={tr('图片供应商', 'Image providers')}>
-                {imageProviders.map((provider) => (
-                  <button
-                    key={provider.id}
-                    type="button"
-                    className={imageProvider === provider.id ? 'active' : ''}
-                    onClick={() => setImageProvider(provider.id)}
-                    title={tr(provider.noteZh, provider.noteEn)}
-                  >
-                    {tr(provider.labelZh, provider.labelEn)}
-                  </button>
-                ))}
-              </div>
-              <label className="api-field" htmlFor="image-aspect-ratio">
-                <span>{tr('生成比例', 'Aspect Ratio')}</span>
-                <select id="image-aspect-ratio" value={imageAspectRatio} onChange={(event) => setImageAspectRatio(event.target.value)}>
-                  {imageAspectRatioOptions.map((ratio) => (
-                    <option key={ratio} value={ratio}>
-                      {ratio === 'adaptive' ? tr('自动 / 沿用底图', 'Auto / Source') : ratio}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {isImageApiSettingsOpen ? (
-                <div className="api-settings-panel">
-                  <div className="api-settings-title">
-                    <strong>
-                      {selectedImageConfig
-                        ? tr(
-                            `${getImageProviderText(selectedImageConfig.id, language, selectedImageConfig.name)} 图片 API 设置`,
-                            `${getImageProviderText(selectedImageConfig.id, language, selectedImageConfig.name)} Image API Settings`,
-                          )
-                        : tr('图片 API 设置', 'Image API Settings')}
-                    </strong>
-                    <button type="button" onClick={() => void loadImageConfig()} disabled={isImageApiConfigLoading}>
-                      <RefreshCcw size={13} />
-                      {tr('刷新', 'Refresh')}
-                    </button>
-                  </div>
-                  {isImageApiConfigLoading ? (
-                    <p className="recent-empty">{tr('正在读取本地图片 API 设置...', 'Reading local image API settings...')}</p>
-                  ) : selectedImageConfig ? (
-                    <div className="api-field-list">
-                      {selectedImageConfig.fields.map((field) => (
-                        <label key={field.key} className="api-field">
-                          <span>
-                            {getVideoConfigFieldLabel(field, language)}
-                            {field.secret && field.configured ? <small>{tr('已保存', 'Saved')}</small> : null}
-                          </span>
-                          <input
-                            type={field.secret ? 'password' : 'text'}
-                            value={imageConfigValues[field.key] ?? ''}
-                            onChange={(event) => setImageConfigValues((values) => ({ ...values, [field.key]: event.target.value }))}
-                            placeholder={field.secret && field.configured ? tr('已保存，留空不修改', 'Saved. Leave blank to keep it.') : field.placeholder || field.key}
-                            autoComplete="off"
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="recent-empty">{tr('还没有读到这个图片平台的设置项。', 'No settings were found for this image provider yet.')}</p>
-                  )}
-                  {imageConfigMessage ? <p className="config-message">{displayImageConfigMessage}</p> : null}
-                  <button type="button" className="secondary-button wide-button" onClick={() => void saveImageApiSettings()} disabled={isImageApiConfigSaving || !selectedImageConfig}>
-                    {isImageApiConfigSaving ? tr('正在保存...', 'Saving...') : tr('保存图片 API 设置', 'Save Image API Settings')}
-                  </button>
-                </div>
-              ) : null}
-              {imageApiMessage ? <pre className="video-task-message">{displayImageApiMessage}</pre> : null}
-              <button type="button" className="secondary-button wide-button" onClick={() => void submitImageApiTask()} disabled={isImageApiSubmitting || !activeImage}>
-                <ImagePlus size={16} />
-                {isImageApiSubmitting ? tr('正在调用图片 API...', 'Calling image API...') : tr('用 API 生成/改图', 'Generate/Edit With API')}
-              </button>
-            </div>
-            <button type="button" className="primary-button" onClick={() => void sendEditTask()}>
-              <Send size={16} />
-              {tr('交给 Codex 重新生成', 'Send to Codex')}
-            </button>
-          </section>
-        ) : null}
       </aside>
 
       <button type="button" className="resize-handle" aria-label={tr('调整左侧宽度', 'Resize side panel')} onPointerDown={startResize} />

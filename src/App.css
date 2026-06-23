@@ -366,6 +366,21 @@ textarea {
   padding: 10px;
 }
 
+.skill-description {
+  margin: -4px 0 0;
+  border: 1px solid #d8e0e8;
+  border-radius: 8px;
+  background: #fbfcfe;
+  color: #526170;
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 9px 10px;
+}
+
+.prompt-control-block textarea {
+  min-height: 86px;
+}
+
 .video-block-header,
 .api-settings-title {
   display: flex;

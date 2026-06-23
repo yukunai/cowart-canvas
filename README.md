@@ -44,6 +44,7 @@ The app runs on your own machine. Imported images, generated task files, video t
 - Resize pin/text annotation boxes directly from a subtle bottom-right handle; the text size grows with the box.
 - Choose annotation color, shape style, and S/M/L/XL defaults.
 - Add up to three extra reference canvases below the main image for product/object/style references.
+- Set image Skill / Generation Strategy, prompt, negative prompt, provider, and aspect ratio from the top of the edit side panel.
 - Read all canvas notes into a structured Codex edit prompt.
 - Send the annotated image task directly to image generation/editing APIs for fal.ai, Alibaba Wanxiang, Volcengine Ark, and Kling.
 - Choose image generation aspect ratios such as auto/source, 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, and 2:3.
