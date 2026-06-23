@@ -59,6 +59,10 @@ function getDragHintDefault(language: Language) {
   return language === 'en' ? 'Release to import image' : '松手导入图片'
 }
 
+function textMentionsEyewearRemoval(text: string) {
+  return /(眼镜|眼境|墨镜|太阳镜|glasses|sunglasses|eyeglasses|eyewear)/i.test(text) && /(去掉|取掉|去除|移除|删除|不要|摘掉|remove|erase|delete|without)/i.test(text)
+}
+
 type RecentImage = {
   path: string
   name: string
@@ -360,6 +364,42 @@ function getAnnotationAnchor(annotation: CanvasAnnotation) {
   if (annotation.kind === 'circle') return { x: annotation.x + annotation.w, y: annotation.y }
   if (annotation.kind === 'pen') return annotation.points.at(-1) ?? annotation.points[0] ?? { x: 50, y: 50 }
   return { x: annotation.x, y: annotation.y }
+}
+
+function getStrictImageEditGuidance(language: Language, annotations: CanvasAnnotation[], hasReferences: boolean) {
+  const notes = annotations.map((annotation) => annotation.text).join('\n')
+  const lines =
+    language === 'en'
+      ? [
+          'Strict local inpainting mode, not full-image regeneration.',
+          'Use the original image as the base. Only edit the marked areas and explicit extra-note targets; keep unmarked areas as close to pixel-identical as possible.',
+          'Lock the subject position, crop, camera distance, lighting, background, clothing, hairstyle, material texture, noise, and overall photographic quality.',
+          'For portraits, preserve the exact same identity, face outline, head shape, jaw, cheekbones, nose shape, mouth shape, ears, hairline, skin tone, facial proportions, and expression. Do not beautify or replace the face.',
+        ]
+      : [
+          '严格局部修补模式，不是整图重绘。',
+          '以原图作为底图，只修改画布标注位置和补充说明明确要求的区域；未标注区域尽量像素级保持不变。',
+          '锁定主体位置、原始裁切、镜头距离、光线、背景、服装、发型、材质纹理、噪点和整体摄影质感。',
+          '如果画面中有人，必须保持同一人物身份、脸型轮廓、头型、下巴、颧骨、鼻型、嘴型、耳朵、发际线、肤色、五官比例和表情；不要美化、不要换脸。',
+        ]
+
+  if (textMentionsEyewearRemoval(notes)) {
+    lines.push(
+      language === 'en'
+        ? 'Eyewear removal rule: only remove the lenses and frame, then naturally reconstruct the hidden eyes, eyelids, eyebrows, nose-bridge shadows, and skin texture. Do not change face width, face length, hair, mouth, clothing, or background.'
+        : '眼镜/墨镜移除规则：只移除镜片和镜框，并自然补出被遮挡的眼睛、眼皮、眉毛、鼻梁阴影和皮肤纹理；不要改变脸宽、脸长、头发、嘴巴、衣服或背景。',
+    )
+  }
+
+  if (hasReferences) {
+    lines.push(
+      language === 'en'
+        ? 'Reference images may guide products, objects, local elements, or style only. Blend them naturally into the original scene without replacing the main subject or making a mechanical collage.'
+        : '参考素材只能作为产品、物件、局部元素或风格参考自然融合；不要替换主图主体，不要机械拼贴。',
+    )
+  }
+
+  return lines.map((line) => `- ${line}`).join('\n')
 }
 
 function getCanvasPoint(event: ReactPointerEvent<HTMLDivElement>) {
@@ -850,9 +890,11 @@ function App() {
           )
         : ''
     const annotationText = notes ? tr(`\n画布标注：\n${notes}`, `\nCanvas annotations:\n${notes}`) : tr('\n没有额外标注，主要根据下方参考素材完成融合。', '\nNo extra annotations. Mainly use the reference materials below for blending.')
+    const strictEditGuidance = getStrictImageEditGuidance(language, annotations, filledCanvasReferences.length > 0)
+    const parameterText = tr(`\n改图参数：\n${strictEditGuidance}`, `\nEdit parameters:\n${strictEditGuidance}`)
     return tr(
-      `请基于这张主图继续改图：${activeImage.title}\n保持主图主体、构图和质感。${referenceText}${extra}${annotationText}`,
-      `Continue editing this main image: ${activeImage.title}\nKeep the main subject, composition, and texture.${referenceText}${extra}${annotationText}`,
+      `请基于这张主图继续改图：${activeImage.title}\n保持主图主体、构图和质感。${parameterText}${referenceText}${extra}${annotationText}`,
+      `Continue editing this main image: ${activeImage.title}\nKeep the main subject, composition, and texture.${parameterText}${referenceText}${extra}${annotationText}`,
     )
   }, [activeImage, annotations, filledCanvasReferences, language, prompt, tr])
 

@@ -1071,13 +1071,47 @@ function isCodexGeneratedRecentImage(filePath: string, fileName: string) {
   return true
 }
 
-function buildCodexInstruction(promptPath: string, imagePath: string, referenceImagePaths: string[] = []) {
+function getAnnotationNoteText(annotations?: unknown[]) {
+  if (!Array.isArray(annotations)) return ''
+  return annotations
+    .map((annotation) => (isRecord(annotation) ? getString(annotation.text) : undefined))
+    .filter((text): text is string => Boolean(text))
+    .join('\n')
+}
+
+function textMentionsEyewearRemoval(text: string) {
+  return /(眼镜|眼境|墨镜|太阳镜|glasses|sunglasses|eyeglasses|eyewear)/i.test(text) && /(去掉|取掉|去除|移除|删除|不要|摘掉|remove|erase|delete|without)/i.test(text)
+}
+
+function buildStrictImageEditGuidance(annotations?: unknown[], hasReferences = false) {
+  const lines = [
+    '严格局部修补模式，不是整图重绘。',
+    '以原图作为底图，只修改画布标注位置和补充说明明确要求的区域；未标注区域尽量像素级保持不变。',
+    '锁定主体位置、原始裁切、镜头距离、光线、背景、服装、发型、材质纹理、噪点和整体摄影质感。',
+    '如果画面中有人，必须保持同一人物身份、脸型轮廓、头型、下巴、颧骨、鼻型、嘴型、耳朵、发际线、肤色、五官比例和表情；不要美化、不要换脸。',
+  ]
+
+  if (textMentionsEyewearRemoval(getAnnotationNoteText(annotations))) {
+    lines.push('眼镜/墨镜移除规则：只移除镜片和镜框，并自然补出被遮挡的眼睛、眼皮、眉毛、鼻梁阴影和皮肤纹理；不要改变脸宽、脸长、头发、嘴巴、衣服或背景。')
+  }
+
+  if (hasReferences) {
+    lines.push('参考素材只能作为产品、物件、局部元素或风格参考自然融合；不要替换主图主体，不要机械拼贴。')
+  }
+
+  return lines
+}
+
+function buildCodexInstruction(promptPath: string, imagePath: string, referenceImagePaths: string[] = [], annotations?: unknown[]) {
+  const guidance = buildStrictImageEditGuidance(annotations, referenceImagePaths.length > 0)
   return [
     '请用 Codex 根据这个画布任务重新生成/修改图片。',
     `原图文件：${imagePath}`,
     referenceImagePaths.length > 0 ? `参考素材文件：\n${referenceImagePaths.map((filePath, index) => `${index + 1}. ${filePath}`).join('\n')}` : null,
     `改图任务：${promptPath}`,
-    '要求：保持主图主体、构图和质感；如果有参考素材，把它们作为任意产品、物件、局部元素或风格参考自然融合进最终图片，不要机械拼贴；生成完成后把新图片路径发给我。',
+    '生成参数：',
+    ...guidance.map((line) => `- ${line}`),
+    '生成完成后把新图片路径发给我。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -1415,6 +1449,7 @@ function localImageImportPlugin(): PluginOption {
             .filter((item): item is NonNullable<typeof item> => Boolean(item))
 
           const editPrompt = body.editPrompt || '请基于这张图片继续改图。'
+          const strictImageEditGuidance = buildStrictImageEditGuidance(body.annotations, savedReferences.length > 0)
           const promptText = [
             editPrompt,
             '',
@@ -1426,13 +1461,16 @@ function localImageImportPlugin(): PluginOption {
             savedReferences.length > 0 ? '参考素材信息：' : null,
             ...savedReferences.map((reference, index) => `- ${index + 1}. ${reference.label}：${reference.title}；文件：${reference.imagePath}`),
             '',
+            '改图参数：',
+            ...strictImageEditGuidance.map((line) => `- ${line}`),
+            '',
             savedReferences.length > 0
-              ? '请保持主图主体、构图和质感，把参考素材作为任意产品、物件、局部元素或风格参考自然融合进最终图片。'
-              : '请保持原图主体、构图和质感，只修改标注指出的问题。',
+              ? '请保持主图主体、构图和质感，把参考素材作为任意产品、物件、局部元素或风格参考自然融合进最终图片；仍然只允许改动标注区域和明确要求区域。'
+              : '请保持原图主体、构图和质感，只修改标注指出的问题；不要整图重绘。',
           ]
             .filter(Boolean)
             .join('\n')
-          const codexInstruction = buildCodexInstruction(promptPath, imagePath, savedReferences.map((reference) => reference.imagePath))
+          const codexInstruction = buildCodexInstruction(promptPath, imagePath, savedReferences.map((reference) => reference.imagePath), body.annotations)
 
           fs.writeFileSync(imagePath, imageBuffer)
           fs.writeFileSync(promptPath, promptText)
