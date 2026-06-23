@@ -2381,17 +2381,6 @@ function App() {
   const selectedImageSkill = imageGenerationSkills.find((skill) => skill.id === imageSkillId) ?? imageGenerationSkills[0]
   const editControlBlock = (
     <section className="chat-block prompt-control-block">
-      <label className="api-field" htmlFor="image-skill-select">
-        <span>{tr('Skill / 生成策略', 'Skill / Strategy')}</span>
-        <select id="image-skill-select" value={imageSkillId} onChange={(event) => setImageSkillId(event.target.value as ImageGenerationSkillId)}>
-          {imageGenerationSkills.map((skill) => (
-            <option key={skill.id} value={skill.id}>
-              {tr(skill.labelZh, skill.labelEn)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="skill-description">{tr(selectedImageSkill.descriptionZh, selectedImageSkill.descriptionEn)}</p>
       <label htmlFor="prompt">{tr('提示词 / 补充说明（可选）', 'Prompt / Extra Notes (Optional)')}</label>
       <textarea
         id="prompt"
@@ -2406,6 +2395,17 @@ function App() {
         onChange={(event) => setImageNegativePrompt(event.target.value)}
         placeholder={tr('比如：不要换脸、不要改变背景、不要多手指、不要模糊', 'Example: no face swap, no background changes, no extra fingers, no blur')}
       />
+      <label className="api-field" htmlFor="image-skill-select">
+        <span>{tr('Skill / 生成策略', 'Skill / Strategy')}</span>
+        <select id="image-skill-select" value={imageSkillId} onChange={(event) => setImageSkillId(event.target.value as ImageGenerationSkillId)}>
+          {imageGenerationSkills.map((skill) => (
+            <option key={skill.id} value={skill.id}>
+              {tr(skill.labelZh, skill.labelEn)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="skill-description">{tr(selectedImageSkill.descriptionZh, selectedImageSkill.descriptionEn)}</p>
       <div className="image-api-panel">
         <div className="video-block-header">
           <p className="block-title">{tr('图片 API 生成', 'Image API Generation')}</p>
