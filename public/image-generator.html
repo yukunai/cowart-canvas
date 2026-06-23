@@ -2,6 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cowart Image Generator</title>
     <style>
@@ -260,6 +261,26 @@
         padding: 10px;
       }
 
+      .skill-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .skill-actions button {
+        min-height: 34px;
+        border-radius: 8px;
+        font-size: 12px;
+        padding: 7px;
+      }
+
+      .skill-meta {
+        margin: -4px 0 0;
+        color: #647587;
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
       .settings {
         display: none;
         gap: 10px;
@@ -495,6 +516,26 @@
             <select id="skillSelect"></select>
           </label>
           <p class="skill-description" id="skillDescription"></p>
+          <div class="skill-actions">
+            <button type="button" id="skillUploadButton">上传 Skill</button>
+            <button type="button" id="skillInstallButton">安装当前</button>
+            <button type="button" id="skillDownloadButton">下载当前</button>
+          </div>
+          <input id="skillInput" type="file" accept="application/json,.json" hidden />
+          <p class="skill-meta" id="skillMeta">Skill 文件是 JSON，可上传后安装到本机列表。</p>
+          <label>
+            生成比例
+            <select id="aspectRatioSelect">
+              <option value="adaptive">自动 / 沿用底图</option>
+              <option value="1:1">1:1</option>
+              <option value="16:9">16:9</option>
+              <option value="9:16">9:16</option>
+              <option value="4:3">4:3</option>
+              <option value="3:4">3:4</option>
+              <option value="3:2">3:2</option>
+              <option value="2:3">2:3</option>
+            </select>
+          </label>
           <label>
             生成/改图要求
             <textarea id="promptInput" placeholder="比如：只把蓝色圆形改成暖红色，保持背景和其它元素不变。"></textarea>
@@ -536,7 +577,7 @@
         { id: "fal", name: "fal.ai" },
       ];
 
-      const skills = [
+      const defaultSkills = [
         {
           id: "strict-local-edit",
           name: "严格局部修补",
@@ -574,8 +615,13 @@
         },
       ];
 
+      const customSkillStorageKey = "cowart-image-generator-skills";
+
       let currentProvider = "wanxiang";
       let currentSkill = "strict-local-edit";
+      let currentAspectRatio = "adaptive";
+      let customSkills = loadCustomSkills();
+      let skills = mergeSkills();
       let configProviders = [];
       let configValues = {};
       let currentImage = null;
@@ -598,6 +644,9 @@
       const referenceList = document.querySelector("#referenceList");
       const skillSelect = document.querySelector("#skillSelect");
       const skillDescription = document.querySelector("#skillDescription");
+      const skillInput = document.querySelector("#skillInput");
+      const skillMeta = document.querySelector("#skillMeta");
+      const aspectRatioSelect = document.querySelector("#aspectRatioSelect");
       const promptInput = document.querySelector("#promptInput");
       const negativePromptInput = document.querySelector("#negativePromptInput");
       const heroResult = document.querySelector("#heroResult");
@@ -626,11 +675,14 @@
       }
 
       function renderSkills() {
+        if (!skills.some((skill) => skill.id === currentSkill)) {
+          currentSkill = skills[0]?.id || "";
+        }
         skillSelect.innerHTML = "";
         for (const skill of skills) {
           const option = document.createElement("option");
           option.value = skill.id;
-          option.textContent = skill.name;
+          option.textContent = skill.installedAt ? `${skill.name} · 已安装` : skill.name;
           skillSelect.appendChild(option);
         }
         skillSelect.value = currentSkill;
@@ -640,6 +692,89 @@
       function updateSkillDescription() {
         const skill = skills.find((item) => item.id === currentSkill) || skills[0];
         skillDescription.textContent = skill ? skill.description : "";
+        skillMeta.textContent = skill
+          ? `当前 Skill：${skill.name}。内置 ${defaultSkills.length} 个，自定义 ${customSkills.length} 个。`
+          : "Skill 文件是 JSON，可上传后安装到本机列表。";
+      }
+
+      function normalizeSkill(value, fallbackIndex = 0) {
+        if (!value || typeof value !== "object") return null;
+        const name = String(value.name || value.title || "").trim();
+        const prompt = String(value.prompt || value.instructions || value.system || "").trim();
+        if (!name || !prompt) return null;
+        const rawId = String(value.id || value.slug || name).trim().toLowerCase();
+        const slug = rawId.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || `skill-${Date.now()}`;
+        const id = slug.startsWith("custom-") ? slug : `custom-${slug}-${fallbackIndex}`;
+        return {
+          id,
+          name,
+          description: String(value.description || value.summary || "用户安装的自定义 Skill。").trim(),
+          prompt,
+          installedAt: value.installedAt || new Date().toISOString(),
+        };
+      }
+
+      function loadCustomSkills() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(customSkillStorageKey) || "[]");
+          return Array.isArray(parsed) ? parsed.map((item, index) => normalizeSkill(item, index)).filter(Boolean) : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function saveCustomSkills() {
+        localStorage.setItem(customSkillStorageKey, JSON.stringify(customSkills, null, 2));
+      }
+
+      function mergeSkills() {
+        const byId = new Map();
+        for (const skill of defaultSkills) byId.set(skill.id, skill);
+        for (const skill of customSkills) byId.set(skill.id, skill);
+        return Array.from(byId.values());
+      }
+
+      function installSkills(nextSkills) {
+        const normalized = nextSkills.map((item, index) => normalizeSkill(item, index)).filter(Boolean);
+        if (normalized.length === 0) {
+          setMessage("没有识别到可安装的 Skill。JSON 里至少要有 name 和 prompt。");
+          return;
+        }
+        const byId = new Map(customSkills.map((skill) => [skill.id, skill]));
+        for (const skill of normalized) byId.set(skill.id, skill);
+        customSkills = Array.from(byId.values());
+        skills = mergeSkills();
+        saveCustomSkills();
+        currentSkill = normalized[0].id;
+        renderSkills();
+        setMessage(`已安装 ${normalized.length} 个 Skill。`);
+      }
+
+      async function uploadSkillFile(file) {
+        if (!file) return;
+        const parsed = JSON.parse(await file.text());
+        const candidates = Array.isArray(parsed) ? parsed : Array.isArray(parsed.skills) ? parsed.skills : [parsed];
+        installSkills(candidates);
+      }
+
+      function downloadCurrentSkill() {
+        const skill = skills.find((item) => item.id === currentSkill) || skills[0];
+        if (!skill) return;
+        const safeName = (skill.name || "cowart-skill").replace(/[\\/:*?"<>|]+/g, "-");
+        const blob = new Blob([JSON.stringify(skill, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${safeName}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        setMessage("已下载当前 Skill。");
+      }
+
+      function installCurrentSkill() {
+        const skill = skills.find((item) => item.id === currentSkill);
+        if (!skill) return;
+        installSkills([{ ...skill, id: `${skill.id}-copy-${Date.now()}`, name: `${skill.name} 副本`, installedAt: undefined }]);
       }
 
       async function loadConfig() {
@@ -800,9 +935,11 @@
         }
         const negativePrompt = negativePromptInput.value.trim();
         const skill = skills.find((item) => item.id === currentSkill) || skills[0];
+        const aspectRatioText = currentAspectRatio === "adaptive" ? "自动 / 沿用底图" : currentAspectRatio;
         const finalPrompt = [
           `Skill：${skill.name}`,
           skill.prompt,
+          `生成比例：${aspectRatioText}`,
           referenceImages.length > 0 ? `参考图数量：${referenceImages.length}。请根据所选 Skill 使用参考图。` : "",
           negativePrompt ? `反向提示词：${negativePrompt}` : "",
           "",
@@ -825,6 +962,7 @@
             annotations: [{ kind: "text", x: 50, y: 50, text: finalPrompt }],
             editPrompt: finalPrompt,
             negativePrompt,
+            aspectRatio: currentAspectRatio,
             imageDataUrl: currentImage.imageDataUrl,
             referenceImageDataUrls: referenceImages.map((reference) => reference.imageDataUrl),
           }),
@@ -914,6 +1052,9 @@
       document.querySelector("#settingsButton").addEventListener("click", () => settingsPanel.classList.toggle("visible"));
       document.querySelector("#refreshConfigButton").addEventListener("click", () => loadConfig().catch((error) => setMessage(error.message)));
       document.querySelector("#saveConfigButton").addEventListener("click", () => saveConfig().catch((error) => setMessage(error.message)));
+      document.querySelector("#skillUploadButton").addEventListener("click", () => skillInput.click());
+      document.querySelector("#skillInstallButton").addEventListener("click", installCurrentSkill);
+      document.querySelector("#skillDownloadButton").addEventListener("click", downloadCurrentSkill);
       document.querySelector("#uploadButton").addEventListener("click", () => fileInput.click());
       document.querySelector("#pasteButton").addEventListener("click", () => pasteImage().catch((error) => setMessage(error.message)));
       document.querySelector("#referenceUploadButton").addEventListener("click", () => referenceInput.click());
@@ -925,11 +1066,18 @@
       });
       document.querySelector("#generateButton").addEventListener("click", () => generateImage().catch((error) => setMessage(error.message)));
       document.querySelector("#refreshHistoryButton").addEventListener("click", () => loadHistory().catch((error) => setMessage(error.message)));
+      skillInput.addEventListener("change", () => {
+        uploadSkillFile(skillInput.files?.[0]).catch((error) => setMessage(error.message));
+        skillInput.value = "";
+      });
       fileInput.addEventListener("change", () => setSourceFile(fileInput.files?.[0]).catch((error) => setMessage(error.message)));
       referenceInput.addEventListener("change", () => addReferenceFiles(referenceInput.files).catch((error) => setMessage(error.message)));
       skillSelect.addEventListener("change", () => {
         currentSkill = skillSelect.value;
         updateSkillDescription();
+      });
+      aspectRatioSelect.addEventListener("change", () => {
+        currentAspectRatio = aspectRatioSelect.value;
       });
 
       for (const eventName of ["dragenter", "dragover"]) {

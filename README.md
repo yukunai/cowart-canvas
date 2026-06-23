@@ -46,6 +46,7 @@ The app runs on your own machine. Imported images, generated task files, video t
 - Add up to three extra reference canvases below the main image for product/object/style references.
 - Read all canvas notes into a structured Codex edit prompt.
 - Send the annotated image task directly to image generation/editing APIs for fal.ai, Alibaba Wanxiang, Volcengine Ark, and Kling.
+- Choose image generation aspect ratios such as auto/source, 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, and 2:3.
 - Switch the full interface between Chinese and English.
 - Create image-to-video tasks from 1 to 5 reference images.
 - Configure video provider API keys in the front-end settings panel or `.env.local`.
@@ -141,7 +142,7 @@ For a simpler page focused only on image generation/editing and visible result h
 http://127.0.0.1:43219/image-generator.html
 ```
 
-The standalone image page supports one source image, up to five reference images, a negative prompt field, and a `Skill / Generation Strategy` selector for strict local editing, portrait identity, reference fusion, style reference, or commercial product imagery.
+The standalone image page supports one source image, up to five reference images, aspect ratio selection, a negative prompt field, and a `Skill / Generation Strategy` selector for strict local editing, portrait identity, reference fusion, style reference, or commercial product imagery. You can also upload custom Skill JSON files, install them into the local browser list, and download the current Skill as a reusable JSON file.
 
 ## Image To Video
 

@@ -754,6 +754,17 @@ textarea {
   gap: 6px;
 }
 
+.api-field input,
+.api-field select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #cfd7e2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #26313d;
+  padding: 0 10px;
+}
+
 .api-field span {
   display: flex;
   align-items: center;
@@ -1315,8 +1326,14 @@ textarea {
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.58);
   color: #647587;
+  cursor: pointer;
   text-align: center;
   padding: 7px;
+}
+
+.reference-slot:focus-visible {
+  outline: 2px solid #1f6feb;
+  outline-offset: 3px;
 }
 
 .reference-slot.filled {
@@ -1341,7 +1358,7 @@ textarea {
   white-space: nowrap;
 }
 
-.reference-slot.filled > span {
+.reference-slot.filled > .reference-slot-title {
   position: absolute;
   right: 4px;
   bottom: 4px;
@@ -1356,8 +1373,40 @@ textarea {
   font-size: 11px;
 }
 
-.reference-slot-delete,
-.reference-slot-clear {
+.reference-slot-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  max-width: calc(100% - 34px);
+  overflow: hidden;
+  border-radius: 5px;
+  background: rgba(17, 24, 39, 0.68);
+  color: #fff !important;
+  font-size: 9px !important;
+  font-weight: 760;
+  line-height: 1;
+  padding: 3px 5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-slot-title {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 2px 4px;
+  transition: opacity 120ms ease;
+}
+
+.reference-slot:hover .reference-slot-title,
+.reference-slot:focus-within .reference-slot-title {
+  opacity: 0;
+}
+
+.reference-slot-delete {
   position: absolute;
   top: 4px;
   right: 4px;
@@ -1368,13 +1417,49 @@ textarea {
   place-items: center;
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.92);
+  opacity: 0.58;
   padding: 0;
+  transition: opacity 120ms ease;
 }
 
-.reference-slot-clear {
-  top: 4px;
-  right: auto;
+.reference-slot:hover .reference-slot-delete,
+.reference-slot:focus-within .reference-slot-delete {
+  opacity: 1;
+}
+
+.reference-slot-actions {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
   left: 4px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.reference-slot:hover .reference-slot-actions,
+.reference-slot:focus-within .reference-slot-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.reference-slot-actions button {
+  min-width: 0;
+  min-height: 22px;
+  border: 0;
+  border-radius: 5px;
+  background: rgba(220, 38, 38, 0.92);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 3px;
+}
+
+.reference-slot-actions button:last-child {
+  background: rgba(79, 70, 229, 0.94);
 }
 
 .reference-slot-resize {

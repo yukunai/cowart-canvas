@@ -54,6 +54,7 @@ type CodexTaskRequest = {
   annotations?: unknown[]
   editPrompt?: string
   negativePrompt?: string
+  aspectRatio?: string
   imageDataUrl?: string
   referenceImageDataUrls?: string[]
 }
@@ -873,6 +874,26 @@ function runwayRatio(aspectRatio: string) {
   return aspectRatio
 }
 
+function normalizeImageAspectRatio(value?: string) {
+  const ratio = value?.trim()
+  if (!ratio || ratio === 'auto' || ratio === 'adaptive') return 'adaptive'
+  if (['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'].includes(ratio)) return ratio
+  return 'adaptive'
+}
+
+function imageSizeForAspectRatio(aspectRatio: string, separator: 'x' | '*' = 'x') {
+  const sizes: Record<string, string> = {
+    '1:1': `1024${separator}1024`,
+    '16:9': `1344${separator}768`,
+    '9:16': `768${separator}1344`,
+    '4:3': `1152${separator}864`,
+    '3:4': `864${separator}1152`,
+    '3:2': `1216${separator}832`,
+    '2:3': `832${separator}1216`,
+  }
+  return sizes[aspectRatio]
+}
+
 function buildProviderRequest(provider: VideoProvider, task: VideoTaskRequest, image: PreparedVideoImage): ProviderRequest {
   const providerName = videoProviderNames[provider]
   const prompt = task.prompt?.trim() || '以这张图片作为首帧生成自然、有镜头运动的视频'
@@ -1069,9 +1090,12 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
   const guidance = buildStrictImageEditGuidance(task.annotations, references.length > 0)
   const annotationText = getAnnotationNoteText(task.annotations)
   const negativePrompt = task.negativePrompt?.trim()
+  const aspectRatio = normalizeImageAspectRatio(task.aspectRatio)
+  const aspectPrompt = aspectRatio === 'adaptive' ? '输出比例：自动，尽量沿用底图比例。' : `输出比例：${aspectRatio}。`
   const prompt = [
     task.editPrompt?.trim() || '请基于这张图片进行局部修改。',
     negativePrompt ? `\n反向提示词：${negativePrompt}` : '',
+    aspectPrompt,
     '',
     '画布标注：',
     annotationText || '没有文字标注，请按补充说明改图。',
@@ -1100,6 +1124,7 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
       body: {
         prompt,
         ...(isMultiImageModel ? { image_urls: imageUrls } : { image_url: image.dataUrl, reference_image_urls: references.map((reference) => reference.dataUrl) }),
+        ...(aspectRatio === 'adaptive' ? {} : { aspect_ratio: aspectRatio }),
         num_images: 1,
         output_format: 'png',
       },
@@ -1134,7 +1159,7 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
         },
         parameters: {
           n: 1,
-          size: '2K',
+          size: aspectRatio === 'adaptive' ? '2K' : imageSizeForAspectRatio(aspectRatio, '*') || '2K',
           watermark: false,
         },
       },
@@ -1160,7 +1185,7 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
         image: image.dataUrl,
         images: inputImages,
         response_format: 'url',
-        size: 'adaptive',
+        size: aspectRatio === 'adaptive' ? 'adaptive' : imageSizeForAspectRatio(aspectRatio) || 'adaptive',
         watermark: false,
       },
     }
@@ -1186,7 +1211,7 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
         image: image.base64,
         image_reference: references[0]?.base64,
         n: 1,
-        aspect_ratio: '16:9',
+        aspect_ratio: aspectRatio === 'adaptive' ? '16:9' : aspectRatio,
       },
     }
   }
@@ -2047,12 +2072,14 @@ function localImageImportPlugin(): PluginOption {
 
           const editPrompt = body.editPrompt || '请基于这张图片继续改图。'
           const negativePrompt = body.negativePrompt?.trim()
+          const aspectRatio = normalizeImageAspectRatio(body.aspectRatio)
           const promptText = [
             editPrompt,
             negativePrompt ? `\n反向提示词：${negativePrompt}` : '',
             '',
             'API 生图参数：',
             `- 平台：${imageProviderNames[provider]}`,
+            `- 生成比例：${aspectRatio === 'adaptive' ? '自动/沿用底图' : aspectRatio}`,
             ...buildStrictImageEditGuidance(body.annotations, savedReferences.length > 0).map((line) => `- ${line}`),
           ].join('\n')
           fs.writeFileSync(promptPath, promptText)
@@ -2068,6 +2095,7 @@ function localImageImportPlugin(): PluginOption {
             annotations: body.annotations ?? [],
             editPrompt,
             negativePrompt: negativePrompt || undefined,
+            aspectRatio,
             promptPath,
             createdAt: new Date().toISOString(),
           })

@@ -124,6 +124,7 @@ const maxCanvasReferenceImages = 3
 const defaultReferenceSlotSize = 88
 const minReferenceSlotSize = 72
 const maxReferenceSlotSize = 150
+const imageAspectRatioOptions = ['adaptive', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3']
 
 type ImageResizeCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
@@ -724,6 +725,8 @@ function App() {
   const [language, setLanguage] = useState<Language>(() => readInitialLanguage())
   const tr = useCallback((zh: string, en: string) => (language === 'en' ? en : zh), [language])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const referenceFileInputRef = useRef<HTMLInputElement | null>(null)
+  const pendingReferenceSlotRef = useRef<number | null>(null)
   const workbenchRef = useRef<HTMLDivElement | null>(null)
   const canvasStageRef = useRef<HTMLDivElement | null>(null)
   const toolboxRef = useRef<HTMLDivElement | null>(null)
@@ -780,6 +783,7 @@ function App() {
   const [videoConfigValues, setVideoConfigValues] = useState<Record<string, string>>({})
   const [videoConfigMessage, setVideoConfigMessage] = useState('')
   const [imageProvider, setImageProvider] = useState<ImageProvider>('fal')
+  const [imageAspectRatio, setImageAspectRatio] = useState('adaptive')
   const [isImageApiSettingsOpen, setIsImageApiSettingsOpen] = useState(false)
   const [isImageApiConfigLoading, setIsImageApiConfigLoading] = useState(false)
   const [isImageApiConfigSaving, setIsImageApiConfigSaving] = useState(false)
@@ -866,11 +870,11 @@ function App() {
   const addReferenceCanvasSlot = useCallback(() => {
     setReferenceSlotCount((current) => {
       if (current >= maxCanvasReferenceImages) {
-        setStatus(tr(`最多先放 ${maxCanvasReferenceImages} 个扩展画布位`, `You can add up to ${maxCanvasReferenceImages} extra canvas slots for now.`))
+        setStatus(tr(`最多先放 ${maxCanvasReferenceImages} 张参考图`, `You can add up to ${maxCanvasReferenceImages} reference images for now.`))
         return current
       }
       const next = current + 1
-      setStatus(tr(`已增加第 ${next} 个下方画布位，可放入任意产品、物件或风格参考图`, `Added extra canvas slot ${next}. Drop any product, object, or style reference there.`))
+      setStatus(tr(`已增加第 ${next} 个参考图位，可放入任意产品、物件或风格参考图`, `Added reference slot ${next}. Drop any product, object, or style reference there.`))
       return next
     })
   }, [tr])
@@ -933,6 +937,11 @@ function App() {
     },
     [fillCanvasReferenceSlots, tr],
   )
+
+  const openReferenceFilePicker = (slotIndex: number) => {
+    pendingReferenceSlotRef.current = slotIndex
+    referenceFileInputRef.current?.click()
+  }
 
   const addImportedFiles = useCallback((files: File[]) => {
     const imported = files.map((file) => ({
@@ -2013,7 +2022,7 @@ function App() {
       return compacted
     })
     setReferenceSlotCount((current) => Math.max(0, current - 1))
-    setStatus(tr(`已删除第 ${slotIndex + 1} 个扩展画布`, `Deleted extra canvas slot ${slotIndex + 1}.`))
+    setStatus(tr(`已删除第 ${slotIndex + 1} 个参考图位`, `Deleted reference slot ${slotIndex + 1}.`))
   }
 
   const startReferenceSlotResize = (event: ReactPointerEvent<HTMLButtonElement>, slotIndex: number) => {
@@ -2030,13 +2039,13 @@ function App() {
       const delta = Math.max(moveEvent.clientX - startX, moveEvent.clientY - startY)
       latestSize = clampReferenceSlotSize(startSize + delta)
       setReferenceSlotSizes((current) => current.map((size, index) => (index === slotIndex ? latestSize : size)))
-      setStatus(tr(`第 ${slotIndex + 1} 个扩展画布 ${latestSize}px`, `Extra canvas slot ${slotIndex + 1}: ${latestSize}px`))
+      setStatus(tr(`第 ${slotIndex + 1} 个参考图 ${latestSize}px`, `Reference image ${slotIndex + 1}: ${latestSize}px`))
     }
 
     const stop = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', stop)
-      setStatus(tr(`已调整第 ${slotIndex + 1} 个扩展画布大小：${latestSize}px`, `Resized extra canvas slot ${slotIndex + 1}: ${latestSize}px`))
+      setStatus(tr(`已调整第 ${slotIndex + 1} 个参考图大小：${latestSize}px`, `Resized reference image ${slotIndex + 1}: ${latestSize}px`))
     }
 
     window.addEventListener('pointermove', move)
@@ -2081,6 +2090,7 @@ function App() {
           annotations,
           editPrompt,
           negativePrompt: imageNegativePrompt.trim(),
+          aspectRatio: imageAspectRatio,
           imageDataUrl,
           referenceImageDataUrls,
         }),
@@ -2143,6 +2153,7 @@ function App() {
           annotations,
           editPrompt,
           negativePrompt: imageNegativePrompt.trim(),
+          aspectRatio: imageAspectRatio,
           imageDataUrl,
           referenceImageDataUrls,
         }),
@@ -2552,6 +2563,18 @@ function App() {
               {tr('粘贴图片', 'Paste Image')}
             </button>
             <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={(event) => event.target.files && importFiles(event.target.files)} />
+            <input
+              ref={referenceFileInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(event) => {
+                const targetSlotIndex = pendingReferenceSlotRef.current
+                pendingReferenceSlotRef.current = null
+                if (event.target.files && targetSlotIndex !== null) addReferenceFiles(Array.from(event.target.files), targetSlotIndex)
+                event.target.value = ''
+              }}
+            />
           </div>
           <div className="button-row">
             <button
@@ -2743,6 +2766,16 @@ function App() {
                   </button>
                 ))}
               </div>
+              <label className="api-field" htmlFor="image-aspect-ratio">
+                <span>{tr('生成比例', 'Aspect Ratio')}</span>
+                <select id="image-aspect-ratio" value={imageAspectRatio} onChange={(event) => setImageAspectRatio(event.target.value)}>
+                  {imageAspectRatioOptions.map((ratio) => (
+                    <option key={ratio} value={ratio}>
+                      {ratio === 'adaptive' ? tr('自动 / 沿用底图', 'Auto / Source') : ratio}
+                    </option>
+                  ))}
+                </select>
+              </label>
               {isImageApiSettingsOpen ? (
                 <div className="api-settings-panel">
                   <div className="api-settings-title">
@@ -2851,7 +2884,7 @@ function App() {
               {activeImage && referenceSlotCount < maxCanvasReferenceImages ? (
                 <button type="button" onClick={addReferenceCanvasSlot}>
                   <ImagePlus size={16} />
-                  {tr('增加画布', 'Add Canvas')}
+                  {tr('添加参考', 'Add Reference')}
                 </button>
               ) : null}
               <button type="button" onClick={exportTask}>
@@ -3184,6 +3217,16 @@ function App() {
                         <div
                           key={reference.id}
                           className={`reference-slot ${referenceImage ? 'filled' : ''}`}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={referenceImage ? tr(`替换 ${getReferenceLabel(index, 'zh')}`, `Replace ${referenceLabel}`) : tr(`添加 ${getReferenceLabel(index, 'zh')}`, `Add ${referenceLabel}`)}
+                          onClick={() => openReferenceFilePicker(index)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              openReferenceFilePicker(index)
+                            }
+                          }}
                           onDragEnter={(event) => event.preventDefault()}
                           onDragOver={(event) => {
                             event.preventDefault()
@@ -3192,29 +3235,57 @@ function App() {
                           onDrop={(event) => handleReferenceSlotDrop(event, index)}
                           style={{ '--reference-slot-size': `${referenceSlotSizes[index] ?? defaultReferenceSlotSize}px` } as CSSProperties}
                         >
-                          <button type="button" className="reference-slot-delete" aria-label={tr(`删除 ${getReferenceLabel(index, 'zh')}`, `Delete ${referenceLabel}`)} onClick={() => removeReferenceCanvasSlot(index)}>
+                          <button
+                            type="button"
+                            className="reference-slot-delete"
+                            aria-label={tr(`删除 ${getReferenceLabel(index, 'zh')}`, `Delete ${referenceLabel}`)}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              removeReferenceCanvasSlot(index)
+                            }}
+                          >
                             <Trash2 size={13} />
                           </button>
                           {referenceImage ? (
                             <>
+                              <span className="reference-slot-badge">{referenceLabel}</span>
                               <img src={referenceImage.src} alt={referenceImage.title} draggable={false} />
-                              <span>{referenceImage.title}</span>
-                              <button type="button" className="reference-slot-clear" aria-label={tr(`移除 ${getReferenceLabel(index, 'zh')} 图片`, `Remove image from ${referenceLabel}`)} onClick={() => setCanvasReferences((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, imageId: undefined } : item)))}>
-                                <Trash2 size={13} />
-                              </button>
+                              <span className="reference-slot-title">{referenceImage.title}</span>
+                              <div className="reference-slot-actions">
+                                <button
+                                  type="button"
+                                  aria-label={tr(`移除 ${getReferenceLabel(index, 'zh')} 图片`, `Remove image from ${referenceLabel}`)}
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    setCanvasReferences((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, imageId: undefined } : item)))
+                                  }}
+                                >
+                                  {tr('移除', 'Remove')}
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={tr(`替换 ${getReferenceLabel(index, 'zh')} 图片`, `Replace image in ${referenceLabel}`)}
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    openReferenceFilePicker(index)
+                                  }}
+                                >
+                                  {tr('替换', 'Replace')}
+                                </button>
+                              </div>
                             </>
                           ) : (
                             <>
-                              <ImagePlus size={22} />
+                              <ImagePlus size={18} />
                               <strong>{referenceLabel}</strong>
-                              <span>{tr('拖入任意参考图', 'Drop any reference image')}</span>
+                              <span>{tr('点击或拖入', 'Click or drop')}</span>
                             </>
                           )}
                           <button
                             type="button"
                             className="reference-slot-resize"
                             aria-label={tr(`调整 ${getReferenceLabel(index, 'zh')} 大小`, `Resize ${referenceLabel}`)}
-                            title={tr('拖拽调整画布大小', 'Drag to resize canvas')}
+                            title={tr('拖拽调整参考图大小', 'Drag to resize reference image')}
                             onPointerDown={(event) => startReferenceSlotResize(event, index)}
                           />
                         </div>
@@ -3228,7 +3299,7 @@ function App() {
                         style={{ '--reference-slot-size': `${defaultReferenceSlotSize}px` } as CSSProperties}
                       >
                         <ImagePlus size={17} />
-                        {tr('增加画布', 'Add Canvas')}
+                        {tr('添加参考', 'Add Reference')}
                       </button>
                     ) : null}
                   </div>
@@ -3240,7 +3311,7 @@ function App() {
                     style={{ '--reference-slot-size': `${defaultReferenceSlotSize}px` } as CSSProperties}
                   >
                     <ImagePlus size={17} />
-                    {tr('增加画布', 'Add Canvas')}
+                    {tr('添加参考', 'Add Reference')}
                   </button>
                 )}
               </div>
