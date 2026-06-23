@@ -53,6 +53,7 @@ type CodexTaskRequest = {
   }>
   annotations?: unknown[]
   editPrompt?: string
+  negativePrompt?: string
   imageDataUrl?: string
   referenceImageDataUrls?: string[]
 }
@@ -1067,8 +1068,10 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
   const providerName = imageProviderNames[provider]
   const guidance = buildStrictImageEditGuidance(task.annotations, references.length > 0)
   const annotationText = getAnnotationNoteText(task.annotations)
+  const negativePrompt = task.negativePrompt?.trim()
   const prompt = [
     task.editPrompt?.trim() || '请基于这张图片进行局部修改。',
+    negativePrompt ? `\n反向提示词：${negativePrompt}` : '',
     '',
     '画布标注：',
     annotationText || '没有文字标注，请按补充说明改图。',
@@ -1897,9 +1900,11 @@ function localImageImportPlugin(): PluginOption {
             .filter((item): item is NonNullable<typeof item> => Boolean(item))
 
           const editPrompt = body.editPrompt || '请基于这张图片继续改图。'
+          const negativePrompt = body.negativePrompt?.trim()
           const strictImageEditGuidance = buildStrictImageEditGuidance(body.annotations, savedReferences.length > 0)
           const promptText = [
             editPrompt,
+            negativePrompt ? `\n反向提示词：${negativePrompt}` : '',
             '',
             '原图信息：',
             `- 标题：${title}`,
@@ -1934,6 +1939,7 @@ function localImageImportPlugin(): PluginOption {
                 references: savedReferences,
                 annotations: body.annotations ?? [],
                 editPrompt,
+                negativePrompt: negativePrompt || undefined,
                 promptPath,
                 codexInstructionPath,
                 createdAt: new Date().toISOString(),
@@ -2040,8 +2046,10 @@ function localImageImportPlugin(): PluginOption {
           })
 
           const editPrompt = body.editPrompt || '请基于这张图片继续改图。'
+          const negativePrompt = body.negativePrompt?.trim()
           const promptText = [
             editPrompt,
+            negativePrompt ? `\n反向提示词：${negativePrompt}` : '',
             '',
             'API 生图参数：',
             `- 平台：${imageProviderNames[provider]}`,
@@ -2059,6 +2067,7 @@ function localImageImportPlugin(): PluginOption {
             references: savedReferences,
             annotations: body.annotations ?? [],
             editPrompt,
+            negativePrompt: negativePrompt || undefined,
             promptPath,
             createdAt: new Date().toISOString(),
           })

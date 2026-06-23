@@ -744,6 +744,7 @@ function App() {
   )
   const [referenceSlotSizes, setReferenceSlotSizes] = useState<number[]>(() => Array.from({ length: maxCanvasReferenceImages }, () => defaultReferenceSlotSize))
   const [prompt, setPrompt] = useState('')
+  const [imageNegativePrompt, setImageNegativePrompt] = useState('')
   const [panelWidth, setPanelWidth] = useState(380)
   const [status, setStatus] = useState(() => getDefaultStatus(readInitialLanguage()))
   const [isWindowDragging, setIsWindowDragging] = useState(false)
@@ -959,8 +960,10 @@ function App() {
     const referenceNotes = filledCanvasReferences
       .map((item, index) => tr(`${index + 1}. ${getReferenceLabel(item.index, 'zh')}：${item.image.title}`, `${index + 1}. ${getReferenceLabel(item.index, 'en')}: ${item.image.title}`))
       .join('\n')
+    const extra = prompt.trim() ? tr(`\n补充说明：${prompt.trim()}`, `\nExtra notes: ${prompt.trim()}`) : ''
+    const negative = imageNegativePrompt.trim() ? tr(`\n反向提示词：${imageNegativePrompt.trim()}`, `\nNegative prompt: ${imageNegativePrompt.trim()}`) : ''
     if (annotations.length === 0 && filledCanvasReferences.length === 0) {
-      return tr(`请基于这张图片继续改图：${activeImage.title}\n还没有画布标注。`, `Continue editing this image: ${activeImage.title}\nNo canvas annotations yet.`)
+      return tr(`请基于这张图片继续改图：${activeImage.title}\n还没有画布标注。${extra}${negative}`, `Continue editing this image: ${activeImage.title}\nNo canvas annotations yet.${extra}${negative}`)
     }
     const notes = annotations
       .map((item, index) => {
@@ -973,7 +976,6 @@ function App() {
         )
       })
       .join('\n')
-    const extra = prompt.trim() ? tr(`\n补充说明：${prompt.trim()}`, `\nExtra notes: ${prompt.trim()}`) : ''
     const referenceText =
       filledCanvasReferences.length > 0
         ? tr(
@@ -985,10 +987,10 @@ function App() {
     const strictEditGuidance = getStrictImageEditGuidance(language, annotations, filledCanvasReferences.length > 0)
     const parameterText = tr(`\n改图参数：\n${strictEditGuidance}`, `\nEdit parameters:\n${strictEditGuidance}`)
     return tr(
-      `请基于这张主图继续改图：${activeImage.title}\n保持主图主体、构图和质感。${parameterText}${referenceText}${extra}${annotationText}`,
-      `Continue editing this main image: ${activeImage.title}\nKeep the main subject, composition, and texture.${parameterText}${referenceText}${extra}${annotationText}`,
+      `请基于这张主图继续改图：${activeImage.title}\n保持主图主体、构图和质感。${parameterText}${referenceText}${extra}${negative}${annotationText}`,
+      `Continue editing this main image: ${activeImage.title}\nKeep the main subject, composition, and texture.${parameterText}${referenceText}${extra}${negative}${annotationText}`,
     )
-  }, [activeImage, annotations, filledCanvasReferences, language, prompt, tr])
+  }, [activeImage, annotations, filledCanvasReferences, imageNegativePrompt, language, prompt, tr])
 
   const importFiles = (fileList: FileList | File[]) => {
     const files = Array.from(fileList).filter((file) => file.type.startsWith('image/'))
@@ -1969,6 +1971,7 @@ function App() {
             })),
             annotations,
             editPrompt,
+            negativePrompt: imageNegativePrompt.trim() || undefined,
           },
           null,
           2,
@@ -2077,6 +2080,7 @@ function App() {
           })),
           annotations,
           editPrompt,
+          negativePrompt: imageNegativePrompt.trim(),
           imageDataUrl,
           referenceImageDataUrls,
         }),
@@ -2101,7 +2105,7 @@ function App() {
       setStatus(tr('先放入一张要修改的图片', 'Place an image to edit first.'))
       return
     }
-    if (annotations.length === 0 && filledCanvasReferences.length === 0 && !prompt.trim()) {
+    if (annotations.length === 0 && filledCanvasReferences.length === 0 && !prompt.trim() && !imageNegativePrompt.trim()) {
       setStatus(tr('先写补充说明、标注位置，或放入参考素材，再用 API 改图', 'Add notes, mark an area, or add reference images before editing with the API.'))
       return
     }
@@ -2138,6 +2142,7 @@ function App() {
           })),
           annotations,
           editPrompt,
+          negativePrompt: imageNegativePrompt.trim(),
           imageDataUrl,
           referenceImageDataUrls,
         }),
@@ -2707,6 +2712,13 @@ function App() {
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               placeholder={tr('比如：整体风格别变，只修我标出来的地方', 'Example: keep the overall style, only fix the areas I marked')}
+            />
+            <label htmlFor="image-negative-prompt">{tr('反向提示词（可选）', 'Negative Prompt (Optional)')}</label>
+            <textarea
+              id="image-negative-prompt"
+              value={imageNegativePrompt}
+              onChange={(event) => setImageNegativePrompt(event.target.value)}
+              placeholder={tr('比如：不要换脸、不要改变背景、不要多手指、不要模糊', 'Example: no face swap, no background changes, no extra fingers, no blur')}
             />
             <p className="block-title">{tr('从画布读到的改图意见', 'Edit Notes Read From Canvas')}</p>
             <pre className="edit-prompt">{editPrompt || tr('还没有放入图片。', 'No image placed yet.')}</pre>

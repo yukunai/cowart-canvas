@@ -483,6 +483,10 @@
             生成/改图要求
             <textarea id="promptInput" placeholder="比如：只把蓝色圆形改成暖红色，保持背景和其它元素不变。"></textarea>
           </label>
+          <label>
+            反向提示词（可选）
+            <textarea id="negativePromptInput" placeholder="比如：不要换脸、不要改变背景、不要多手指、不要模糊、不要文字乱码。"></textarea>
+          </label>
           <button type="button" class="primary" id="generateButton">生成图片</button>
           <pre class="message" id="message">准备就绪。</pre>
         </section>
@@ -579,6 +583,7 @@
       const skillSelect = document.querySelector("#skillSelect");
       const skillDescription = document.querySelector("#skillDescription");
       const promptInput = document.querySelector("#promptInput");
+      const negativePromptInput = document.querySelector("#negativePromptInput");
       const heroResult = document.querySelector("#heroResult");
       const historyGrid = document.querySelector("#historyGrid");
       const historyCount = document.querySelector("#historyCount");
@@ -777,11 +782,13 @@
           setMessage("先写生成/改图要求。");
           return;
         }
+        const negativePrompt = negativePromptInput.value.trim();
         const skill = skills.find((item) => item.id === currentSkill) || skills[0];
         const finalPrompt = [
           `Skill：${skill.name}`,
           skill.prompt,
           referenceImages.length > 0 ? `参考图数量：${referenceImages.length}。请根据所选 Skill 使用参考图。` : "",
+          negativePrompt ? `反向提示词：${negativePrompt}` : "",
           "",
           `用户要求：${editPrompt}`,
         ]
@@ -801,6 +808,7 @@
             })),
             annotations: [{ kind: "text", x: 50, y: 50, text: finalPrompt }],
             editPrompt: finalPrompt,
+            negativePrompt,
             imageDataUrl: currentImage.imageDataUrl,
             referenceImageDataUrls: referenceImages.map((reference) => reference.imageDataUrl),
           }),
