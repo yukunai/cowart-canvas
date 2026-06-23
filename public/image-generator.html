@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cowart Image Generator</title>
+    <style>
+      :root {
+        color: #202938;
+        background: #f3f6f8;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid #d4dce6;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #243244;
+        cursor: pointer;
+        font-weight: 760;
+        min-height: 38px;
+        padding: 0 12px;
+      }
+
+      button:hover {
+        border-color: #9db6df;
+        background: #eef5ff;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 380px minmax(0, 1fr);
+        height: 100vh;
+        min-height: 720px;
+      }
+
+      .sidebar {
+        overflow: auto;
+        border-right: 1px solid #dce3eb;
+        background: #ffffff;
+      }
+
+      .header,
+      .section {
+        display: grid;
+        gap: 12px;
+        border-bottom: 1px solid #edf1f5;
+        padding: 18px;
+      }
+
+      .title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      p {
+        margin: 0;
+        color: #647587;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        color: #314050;
+        font-size: 13px;
+        font-weight: 740;
+      }
+
+      textarea,
+      input,
+      select {
+        width: 100%;
+        border: 1px solid #d7dee7;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: #26313d;
+        outline: none;
+        padding: 10px 11px;
+      }
+
+      textarea {
+        min-height: 132px;
+        resize: vertical;
+      }
+
+      textarea:focus,
+      input:focus,
+      select:focus {
+        border-color: #1f6feb;
+        box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.12);
+      }
+
+      .provider-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .provider-grid button.active {
+        border-color: #1f6feb;
+        background: #eaf2ff;
+        color: #164ea6;
+      }
+
+      .button-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .primary {
+        border-color: #1f6feb;
+        background: #2872ee;
+        color: #ffffff;
+      }
+
+      .primary:hover {
+        background: #1f64d5;
+        color: #ffffff;
+      }
+
+      .drop-zone {
+        display: grid;
+        place-items: center;
+        min-height: 184px;
+        border: 1px dashed #aebed0;
+        border-radius: 10px;
+        background: #f8fafc;
+        color: #526170;
+        text-align: center;
+        padding: 16px;
+      }
+
+      .drop-zone.dragging {
+        border-color: #1f6feb;
+        background: #eef5ff;
+      }
+
+      .source-preview {
+        display: none;
+        gap: 10px;
+      }
+
+      .source-preview.visible {
+        display: grid;
+      }
+
+      .source-preview img {
+        width: 100%;
+        max-height: 260px;
+        border: 1px solid #d8e0e8;
+        border-radius: 8px;
+        background: #121720;
+        object-fit: contain;
+      }
+
+      .settings {
+        display: none;
+        gap: 10px;
+        border: 1px solid #d8e0e8;
+        border-radius: 8px;
+        background: #fbfcfe;
+        padding: 10px;
+      }
+
+      .settings.visible {
+        display: grid;
+      }
+
+      .field-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .main {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid #dce3eb;
+        background: #ffffff;
+        padding: 14px 18px;
+      }
+
+      .topbar strong {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .workspace {
+        overflow: auto;
+        padding: 22px;
+      }
+
+      .hero-result {
+        display: grid;
+        gap: 14px;
+        max-width: 1120px;
+        margin: 0 auto 22px;
+      }
+
+      .result-card {
+        display: grid;
+        gap: 12px;
+        border: 1px solid #dce3eb;
+        border-radius: 10px;
+        background: #ffffff;
+        padding: 14px;
+      }
+
+      .result-card img {
+        width: 100%;
+        max-height: 68vh;
+        border-radius: 8px;
+        background: #121720;
+        object-fit: contain;
+      }
+
+      .result-meta {
+        display: grid;
+        gap: 6px;
+        color: #526170;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .result-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .history {
+        display: grid;
+        gap: 12px;
+        max-width: 1120px;
+        margin: 0 auto;
+      }
+
+      .history-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .history-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+        gap: 12px;
+      }
+
+      .thumb {
+        display: grid;
+        gap: 8px;
+        border: 1px solid #d8e0e8;
+        border-radius: 9px;
+        background: #ffffff;
+        color: #26313d;
+        cursor: pointer;
+        padding: 8px;
+        text-align: left;
+      }
+
+      .thumb.selected {
+        border-color: #1f6feb;
+        box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.14);
+      }
+
+      .thumb img {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        border-radius: 6px;
+        background: #121720;
+        object-fit: cover;
+      }
+
+      .thumb span {
+        overflow: hidden;
+        font-size: 12px;
+        font-weight: 720;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .message {
+        white-space: pre-wrap;
+        border: 1px solid #dce3eb;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: #314050;
+        font-size: 12px;
+        line-height: 1.55;
+        min-height: 42px;
+        padding: 10px;
+      }
+
+      .empty {
+        display: grid;
+        place-items: center;
+        min-height: 360px;
+        border: 1px dashed #b8c6d5;
+        border-radius: 10px;
+        background: #ffffff;
+        color: #647587;
+        text-align: center;
+        padding: 28px;
+      }
+
+      @media (max-width: 900px) {
+        .app {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+
+        .sidebar {
+          border-right: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <aside class="sidebar">
+        <section class="header">
+          <div class="title-row">
+            <h1>图片生成 / 改图</h1>
+            <button type="button" id="backButton">回画布</button>
+          </div>
+          <p>上传、粘贴或拖入一张底图，选择 API 后生成。结果会直接显示在右侧，也会保存到本机任务目录。</p>
+        </section>
+
+        <section class="section">
+          <h2>选择平台</h2>
+          <div class="provider-grid" id="providerGrid"></div>
+          <button type="button" id="settingsButton">API 设置</button>
+          <div class="settings" id="settingsPanel">
+            <div class="title-row">
+              <h2 id="settingsTitle">API 设置</h2>
+              <button type="button" id="refreshConfigButton">刷新</button>
+            </div>
+            <div class="field-grid" id="settingsFields"></div>
+            <button type="button" class="primary" id="saveConfigButton">保存 API 设置</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2>底图</h2>
+          <div class="button-row">
+            <button type="button" id="uploadButton">上传图片</button>
+            <button type="button" id="pasteButton">粘贴图片</button>
+          </div>
+          <input id="fileInput" type="file" accept="image/*" hidden />
+          <div class="drop-zone" id="dropZone">
+            <p>把图片拖到这里，或用上传/粘贴导入</p>
+          </div>
+          <div class="source-preview" id="sourcePreview">
+            <img id="sourceImage" alt="source" />
+            <p id="sourceName"></p>
+          </div>
+        </section>
+
+        <section class="section">
+          <label>
+            生成/改图要求
+            <textarea id="promptInput" placeholder="比如：只把蓝色圆形改成暖红色，保持背景和其它元素不变。"></textarea>
+          </label>
+          <button type="button" class="primary" id="generateButton">生成图片</button>
+          <pre class="message" id="message">准备就绪。</pre>
+        </section>
+      </aside>
+
+      <section class="main">
+        <header class="topbar">
+          <strong id="topStatus">生成结果会展示在这里</strong>
+          <button type="button" id="refreshHistoryButton">刷新历史结果</button>
+        </header>
+        <div class="workspace">
+          <section class="hero-result" id="heroResult">
+            <div class="empty">还没有结果。生成成功后会直接显示在这里。</div>
+          </section>
+          <section class="history">
+            <div class="history-header">
+              <h2>历史生成</h2>
+              <p id="historyCount">0 张</p>
+            </div>
+            <div class="history-grid" id="historyGrid"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const providers = [
+        { id: "wanxiang", name: "阿里万象" },
+        { id: "volcengine", name: "火山" },
+        { id: "kling", name: "可灵" },
+        { id: "fal", name: "fal.ai" },
+      ];
+
+      let currentProvider = "wanxiang";
+      let configProviders = [];
+      let configValues = {};
+      let currentImage = null;
+      let selectedHistoryPath = "";
+
+      const providerGrid = document.querySelector("#providerGrid");
+      const settingsPanel = document.querySelector("#settingsPanel");
+      const settingsTitle = document.querySelector("#settingsTitle");
+      const settingsFields = document.querySelector("#settingsFields");
+      const message = document.querySelector("#message");
+      const topStatus = document.querySelector("#topStatus");
+      const fileInput = document.querySelector("#fileInput");
+      const sourcePreview = document.querySelector("#sourcePreview");
+      const sourceImage = document.querySelector("#sourceImage");
+      const sourceName = document.querySelector("#sourceName");
+      const dropZone = document.querySelector("#dropZone");
+      const promptInput = document.querySelector("#promptInput");
+      const heroResult = document.querySelector("#heroResult");
+      const historyGrid = document.querySelector("#historyGrid");
+      const historyCount = document.querySelector("#historyCount");
+
+      function setMessage(text) {
+        message.textContent = text;
+        topStatus.textContent = text.split("\n")[0] || "准备就绪";
+      }
+
+      function renderProviders() {
+        providerGrid.innerHTML = "";
+        for (const provider of providers) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = provider.name;
+          button.className = provider.id === currentProvider ? "active" : "";
+          button.addEventListener("click", () => {
+            currentProvider = provider.id;
+            renderProviders();
+            renderSettings();
+          });
+          providerGrid.appendChild(button);
+        }
+      }
+
+      async function loadConfig() {
+        const response = await fetch("/api/image-config", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || "读取 API 设置失败");
+        configProviders = data.providers || [];
+        for (const provider of configProviders) {
+          for (const field of provider.fields) {
+            if (field.secret) {
+              configValues[field.key] ||= "";
+            } else {
+              configValues[field.key] = field.value || "";
+            }
+          }
+        }
+        renderSettings();
+      }
+
+      function renderSettings() {
+        const provider = configProviders.find((item) => item.id === currentProvider);
+        settingsFields.innerHTML = "";
+        settingsTitle.textContent = `${provider?.name || currentProvider} API 设置`;
+        if (!provider) {
+          settingsFields.innerHTML = "<p>还没有读到这个平台的设置项。</p>";
+          return;
+        }
+        for (const field of provider.fields) {
+          const label = document.createElement("label");
+          const title = document.createElement("span");
+          title.textContent = field.configured && field.secret ? `${field.label}（已保存）` : field.label;
+          const input = document.createElement("input");
+          input.type = field.secret ? "password" : "text";
+          input.value = configValues[field.key] || "";
+          input.placeholder = field.secret && field.configured ? "已保存，留空不修改" : field.placeholder || field.key;
+          input.autocomplete = "off";
+          input.addEventListener("input", () => {
+            configValues[field.key] = input.value;
+          });
+          label.append(title, input);
+          settingsFields.appendChild(label);
+        }
+      }
+
+      async function saveConfig() {
+        const provider = configProviders.find((item) => item.id === currentProvider);
+        if (!provider) return;
+        const values = Object.fromEntries(provider.fields.map((field) => [field.key, configValues[field.key] || ""]));
+        setMessage("正在保存 API 设置...");
+        const response = await fetch("/api/image-config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: currentProvider, values }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || "保存 API 设置失败");
+        configProviders = data.providers || [];
+        renderSettings();
+        setMessage("API 设置已保存。");
+      }
+
+      function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error || new Error("读图失败"));
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function setSourceFile(file) {
+        if (!file || !file.type.startsWith("image/")) return;
+        const dataUrl = await readFileAsDataUrl(file);
+        currentImage = {
+          title: file.name || "source.png",
+          source: "uploaded",
+          imageDataUrl: dataUrl,
+        };
+        sourceImage.src = dataUrl;
+        sourceName.textContent = file.name || "source.png";
+        sourcePreview.classList.add("visible");
+        setMessage("底图已导入，可以生成。");
+      }
+
+      async function pasteImage() {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const type = item.types.find((itemType) => itemType.startsWith("image/"));
+          if (!type) continue;
+          const blob = await item.getType(type);
+          await setSourceFile(new File([blob], `pasted-${Date.now()}.png`, { type }));
+          return;
+        }
+        setMessage("剪贴板里没有图片。");
+      }
+
+      async function generateImage() {
+        if (!currentImage) {
+          setMessage("先上传、粘贴或拖入一张底图。");
+          return;
+        }
+        const editPrompt = promptInput.value.trim();
+        if (!editPrompt) {
+          setMessage("先写生成/改图要求。");
+          return;
+        }
+        const providerName = providers.find((item) => item.id === currentProvider)?.name || currentProvider;
+        setMessage(`正在提交到 ${providerName}...`);
+        const response = await fetch("/api/image-generation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: currentProvider,
+            image: { title: currentImage.title, source: currentImage.source },
+            annotations: [{ kind: "text", x: 50, y: 50, text: editPrompt }],
+            editPrompt,
+            imageDataUrl: currentImage.imageDataUrl,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error || "生成失败");
+        }
+        if (data.status === "needs_config") {
+          setMessage(`还没提交到 ${providerName}：缺少 ${(data.missingEnv || []).join("、")}\n任务目录：${data.directory || ""}`);
+          return;
+        }
+        if (data.resultImageUrl && data.resultImagePath) {
+          showResult({
+            name: data.resultImagePath.split("/").slice(-2).join("/"),
+            path: data.resultImagePath,
+            url: data.resultImageUrl,
+          });
+          setMessage(`生成成功：${data.resultImagePath}`);
+          await loadHistory();
+          return;
+        }
+        setMessage(`已提交到 ${providerName}，但平台暂时没有直接返回图片。\n任务目录：${data.directory || ""}\n任务 ID：${data.providerTaskId || ""}`);
+        await loadHistory();
+      }
+
+      function showResult(image) {
+        selectedHistoryPath = image.path;
+        heroResult.innerHTML = "";
+        const card = document.createElement("article");
+        card.className = "result-card";
+        const img = document.createElement("img");
+        img.src = image.url;
+        img.alt = image.name;
+        const meta = document.createElement("div");
+        meta.className = "result-meta";
+        meta.innerHTML = `<strong>${escapeHtml(image.name)}</strong><span>${escapeHtml(image.path)}</span>`;
+        const actions = document.createElement("div");
+        actions.className = "result-actions";
+        const open = document.createElement("a");
+        open.href = image.url;
+        open.target = "_blank";
+        open.rel = "noreferrer";
+        open.textContent = "打开图片";
+        const download = document.createElement("a");
+        download.href = image.url;
+        download.download = image.name || "cowart-image.png";
+        download.textContent = "下载图片";
+        actions.append(open, download);
+        card.append(img, meta, actions);
+        heroResult.appendChild(card);
+        renderHistorySelection();
+      }
+
+      async function loadHistory() {
+        const response = await fetch("/api/recent-images", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "读取历史结果失败");
+        const images = (data.images || []).filter((image) => /result|output|wanxiang|kling|volcengine|fal/i.test(`${image.name} ${image.path}`));
+        historyCount.textContent = `${images.length} 张`;
+        historyGrid.innerHTML = "";
+        for (const image of images.slice(0, 40)) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `thumb ${selectedHistoryPath === image.path ? "selected" : ""}`;
+          button.title = image.path;
+          button.innerHTML = `<img src="${image.url}" alt=""><span>${escapeHtml(image.name)}</span>`;
+          button.addEventListener("click", () => showResult(image));
+          historyGrid.appendChild(button);
+        }
+        if (!selectedHistoryPath && images[0]) showResult(images[0]);
+      }
+
+      function renderHistorySelection() {
+        for (const button of historyGrid.querySelectorAll(".thumb")) {
+          button.classList.toggle("selected", button.title === selectedHistoryPath);
+        }
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
+      }
+
+      document.querySelector("#backButton").addEventListener("click", () => {
+        window.location.href = "/?installed=1";
+      });
+      document.querySelector("#settingsButton").addEventListener("click", () => settingsPanel.classList.toggle("visible"));
+      document.querySelector("#refreshConfigButton").addEventListener("click", () => loadConfig().catch((error) => setMessage(error.message)));
+      document.querySelector("#saveConfigButton").addEventListener("click", () => saveConfig().catch((error) => setMessage(error.message)));
+      document.querySelector("#uploadButton").addEventListener("click", () => fileInput.click());
+      document.querySelector("#pasteButton").addEventListener("click", () => pasteImage().catch((error) => setMessage(error.message)));
+      document.querySelector("#generateButton").addEventListener("click", () => generateImage().catch((error) => setMessage(error.message)));
+      document.querySelector("#refreshHistoryButton").addEventListener("click", () => loadHistory().catch((error) => setMessage(error.message)));
+      fileInput.addEventListener("change", () => setSourceFile(fileInput.files?.[0]).catch((error) => setMessage(error.message)));
+
+      for (const eventName of ["dragenter", "dragover"]) {
+        dropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropZone.classList.add("dragging");
+        });
+      }
+      for (const eventName of ["dragleave", "drop"]) {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove("dragging"));
+      }
+      dropZone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        const file = Array.from(event.dataTransfer.files || []).find((item) => item.type.startsWith("image/"));
+        if (file) setSourceFile(file).catch((error) => setMessage(error.message));
+      });
+
+      renderProviders();
+      loadConfig().catch((error) => setMessage(error.message));
+      loadHistory().catch((error) => setMessage(error.message));
+    </script>
+  </body>
+</html>

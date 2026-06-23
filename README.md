@@ -135,6 +135,12 @@ The edit canvas can submit the current main image, annotations, extra notes, and
 
 Provider keys, model names, and endpoints can be saved from the front-end `Image API Generation` settings panel. If a provider returns an image immediately, Cowart saves it under `codex-image-tasks/` and imports it back into `Image Results`. If a provider only returns a task ID, Cowart stores the provider response and task folder so you can inspect or retry it.
 
+For a simpler page focused only on image generation/editing and visible result history, open:
+
+```text
+http://127.0.0.1:43219/image-generator.html
+```
+
 ## Image To Video
 
 The Video panel supports these providers:

@@ -2339,6 +2339,10 @@ function App() {
             <Video size={15} />
             {tr('生成视频', 'Video')}
           </button>
+          <button type="button" className="video-entry-button" onClick={() => { window.location.href = '/image-generator.html' }}>
+            <ImagePlus size={15} />
+            {tr('生成图片', 'Image')}
+          </button>
           <label className="language-select">
             <Globe2 size={14} />
             <select aria-label={tr('语言', 'Language')} value={language} onChange={(event) => setLanguage(event.target.value as Language)}>
