@@ -141,6 +141,8 @@ For a simpler page focused only on image generation/editing and visible result h
 http://127.0.0.1:43219/image-generator.html
 ```
 
+The standalone image page supports one source image, up to five reference images, and a `Skill / Generation Strategy` selector for strict local editing, portrait identity, reference fusion, style reference, or commercial product imagery.
+
 ## Image To Video
 
 The Video panel supports these providers:
