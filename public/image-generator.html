@@ -197,22 +197,23 @@
 
       .reference-list {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
+        grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+        gap: 7px;
       }
 
       .reference-card {
+        position: relative;
         display: grid;
-        gap: 6px;
+        gap: 4px;
         border: 1px solid #d8e0e8;
-        border-radius: 8px;
+        border-radius: 9px;
         background: #fbfcfe;
-        padding: 7px;
+        padding: 5px;
       }
 
       .reference-card img {
         width: 100%;
-        aspect-ratio: 4 / 3;
+        aspect-ratio: 1;
         border-radius: 6px;
         background: #121720;
         object-fit: cover;
@@ -221,17 +222,32 @@
       .reference-card span {
         overflow: hidden;
         color: #314050;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 720;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
       .reference-card button {
-        min-height: 28px;
-        border-radius: 6px;
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 22px;
+        min-width: 22px;
+        height: 22px;
+        min-height: 22px;
+        overflow: hidden;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.92);
         color: #b42318;
-        font-size: 12px;
+        font-size: 0;
+        padding: 0;
+      }
+
+      .reference-card button::before {
+        font-size: 14px;
+        line-height: 1;
+        content: "×";
       }
 
       .skill-description {

@@ -1286,12 +1286,12 @@ textarea {
   width: max-content;
   min-width: min(100%, 260px);
   justify-items: center;
-  gap: 28px;
+  gap: 18px;
   padding: 18px;
 }
 
 .composition-canvas.has-reference-slots {
-  padding-bottom: 34px;
+  padding-bottom: 24px;
 }
 
 .reference-slots {
@@ -1299,29 +1299,30 @@ textarea {
   align-items: flex-start;
   justify-content: center;
   flex-wrap: nowrap;
-  gap: clamp(14px, 5%, 44px);
+  gap: clamp(8px, 2.4vw, 18px);
   max-width: 100%;
 }
 
 .reference-slot {
   position: relative;
   display: grid;
-  width: var(--reference-slot-size, 160px);
-  min-width: var(--reference-slot-size, 160px);
+  width: var(--reference-slot-size, 88px);
+  min-width: var(--reference-slot-size, 88px);
   aspect-ratio: 1;
   place-items: center;
   overflow: hidden;
-  border: 3px solid rgba(156, 163, 175, 0.72);
-  border-radius: 4px;
+  border: 1px solid rgba(100, 116, 139, 0.58);
+  border-radius: 9px;
   background: rgba(255, 255, 255, 0.58);
   color: #647587;
   text-align: center;
-  padding: 14px;
+  padding: 7px;
 }
 
 .reference-slot.filled {
-  border-color: rgba(75, 85, 99, 0.82);
+  border-color: rgba(45, 65, 95, 0.72);
   background: #ffffff;
+  box-shadow: 0 8px 20px rgba(20, 31, 44, 0.1);
 }
 
 .reference-slot > img {
@@ -1334,7 +1335,7 @@ textarea {
   max-width: 100%;
   overflow: hidden;
   color: #2c3a49;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1342,38 +1343,38 @@ textarea {
 
 .reference-slot.filled > span {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  left: 8px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.88);
-  padding: 4px 6px;
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 2px 4px;
 }
 
 .reference-slot > strong {
   color: #314255;
-  font-size: 14px;
+  font-size: 11px;
 }
 
 .reference-slot-delete,
 .reference-slot-clear {
   position: absolute;
-  top: 7px;
-  right: 7px;
+  top: 4px;
+  right: 4px;
   display: grid;
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
   place-items: center;
-  border-radius: 8px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, 0.92);
   padding: 0;
 }
 
 .reference-slot-clear {
-  top: 7px;
+  top: 4px;
   right: auto;
-  left: 7px;
+  left: 4px;
 }
 
 .reference-slot-resize {
@@ -1418,18 +1419,19 @@ textarea {
   align-content: center;
   justify-content: center;
   justify-items: center;
-  gap: 7px;
-  width: var(--reference-slot-size, 160px);
-  min-width: var(--reference-slot-size, 160px);
+  gap: 5px;
+  width: var(--reference-slot-size, 88px);
+  min-width: var(--reference-slot-size, 88px);
   aspect-ratio: 1;
   min-height: 0;
   border-style: dashed;
   border-color: #aebbd0;
-  border-radius: 4px;
+  border-radius: 9px;
   background: rgba(255, 255, 255, 0.72);
   color: #3a4a5c;
+  font-size: 11px;
   font-weight: 760;
-  padding: 14px;
+  padding: 7px;
 }
 
 .canvas-toolbox {
