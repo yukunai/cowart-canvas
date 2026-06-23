@@ -446,6 +446,8 @@ function isAnnotationControlTarget(target: EventTarget | null) {
 
 function toLocalImageUrl(source: string) {
   const trimmed = source.trim()
+  if (trimmed.startsWith('/api/local-image?')) return trimmed
+
   if (trimmed.startsWith('file://')) {
     try {
       return `/api/local-image?path=${encodeURIComponent(new URL(trimmed).pathname)}`
@@ -482,6 +484,10 @@ function extractImageLikeSources(value: string) {
   const markdownMatch = value.match(/!\[[^\]]*]\(([^)]+)\)/)
   if (markdownMatch?.[1]) sources.push(markdownMatch[1])
   return sources
+}
+
+function isReferenceSlotEventTarget(target: EventTarget | null) {
+  return target instanceof Element && Boolean(target.closest('.reference-slot'))
 }
 
 function blobToDataUrl(blob: Blob) {
@@ -1021,6 +1027,30 @@ function App() {
     return true
   }, [activeImageId, addVideoImages, fillCanvasReferenceSlots, hasReferenceCanvas, isVideoPanelOpen, tr])
 
+  const importReferenceImageUrl = useCallback(
+    (url: string, targetSlotIndex: number) => {
+      const trimmed = url.trim()
+      const localUrl = toLocalImageUrl(trimmed)
+      const filePath = toLocalImagePath(trimmed) ?? undefined
+      const src = localUrl ?? trimmed
+      if (!localUrl && !/^https?:\/\//.test(trimmed) && !trimmed.startsWith('blob:') && !trimmed.startsWith('data:image/')) return false
+
+      const next: GeneratedImage = {
+        id: `reference-url-${Date.now()}`,
+        title: localUrl ? trimmed.split('/').pop() || tr('本机素材', 'Local reference') : tr('外部素材', 'External reference'),
+        src,
+        prompt: tr(`外部参考素材：${trimmed}`, `External reference: ${trimmed}`),
+        source: 'url',
+        filePath,
+      }
+      setImages((items) => [next, ...items])
+      fillCanvasReferenceSlots([next.id], targetSlotIndex)
+      setStatus(tr('已把拖入的图片加入这个参考素材槽', 'Dropped image added to this reference slot.'))
+      return true
+    },
+    [fillCanvasReferenceSlots, tr],
+  )
+
   const loadRecentImages = async () => {
     setIsRecentOpen(true)
     setIsRecentLoading(true)
@@ -1395,6 +1425,77 @@ function App() {
     return false
   }
 
+  const importDataTransferAsReference = async (dataTransfer: DataTransfer | null, targetSlotIndex: number) => {
+    if (!dataTransfer) return false
+
+    const files = Array.from(dataTransfer.files).filter((file) => file.type.startsWith('image/'))
+    if (files.length > 0) {
+      addReferenceFiles(files, targetSlotIndex)
+      return true
+    }
+
+    const itemFiles = Array.from(dataTransfer.items)
+      .filter((item) => item.kind === 'file')
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null)
+      .filter((file) => file.type.startsWith('image/'))
+    if (itemFiles.length > 0) {
+      addReferenceFiles(itemFiles, targetSlotIndex)
+      return true
+    }
+
+    const imageId = dataTransfer.getData('application/x-cowart-image-id') || dataTransfer.getData('text/plain')
+    if (imageId && images.some((image) => image.id === imageId)) {
+      addCanvasReferenceImage(imageId, targetSlotIndex)
+      return true
+    }
+
+    const directCandidates = [
+      dataTransfer.getData('text/uri-list'),
+      imageId,
+      dataTransfer.getData('URL'),
+      dataTransfer.getData('public.url'),
+    ].filter(Boolean)
+
+    for (const candidate of directCandidates) {
+      for (const source of extractImageLikeSources(candidate)) {
+        if (importReferenceImageUrl(source, targetSlotIndex)) return true
+      }
+    }
+
+    const downloadUrl = dataTransfer.getData('DownloadURL')
+    if (downloadUrl) {
+      const parts = downloadUrl.split(':')
+      const maybeUrl = parts.slice(2).join(':')
+      if (maybeUrl && importReferenceImageUrl(maybeUrl, targetSlotIndex)) return true
+    }
+
+    const html = dataTransfer.getData('text/html')
+    for (const source of extractImageLikeSources(html)) {
+      if (importReferenceImageUrl(source, targetSlotIndex)) return true
+    }
+
+    const stringItems = await Promise.all(
+      Array.from(dataTransfer.items)
+        .filter((item) => item.kind === 'string')
+        .map(
+          (item) =>
+            new Promise<string>((resolve) => {
+              item.getAsString((value) => resolve(value))
+            }),
+        ),
+    )
+    for (const value of stringItems) {
+      for (const source of extractImageLikeSources(value)) {
+        if (importReferenceImageUrl(source, targetSlotIndex)) return true
+      }
+    }
+
+    const types = Array.from(dataTransfer.types).join(', ') || tr('无', 'none')
+    setStatus(tr(`没有识别到素材图片。拖拽数据类型：${types}。可以先把图片导入左侧，再拖到这个素材槽。`, `No reference image was detected. Drag data types: ${types}. Import the image on the left first, then drag it into this slot.`))
+    return false
+  }
+
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
       const files = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'))
@@ -1447,7 +1548,7 @@ function App() {
     }
 
     const handleNativeDrop = (event: DragEvent) => {
-      if (event.target instanceof Element && event.target.closest('.reference-slot')) {
+      if (isReferenceSlotEventTarget(event.target)) {
         setIsWindowDragging(false)
         return
       }
@@ -1704,6 +1805,8 @@ function App() {
   }
 
   const handleDrop = (event: ReactDragEvent<HTMLElement>) => {
+    if (isReferenceSlotEventTarget(event.target)) return
+
     event.preventDefault()
     event.stopPropagation()
     void importDataTransfer(event.dataTransfer)
@@ -1712,20 +1815,7 @@ function App() {
   const handleReferenceSlotDrop = (event: ReactDragEvent<HTMLDivElement>, slotIndex: number) => {
     event.preventDefault()
     event.stopPropagation()
-
-    const files = Array.from(event.dataTransfer.files).filter((file) => file.type.startsWith('image/'))
-    if (files.length > 0) {
-      addReferenceFiles(files, slotIndex)
-      return
-    }
-
-    const imageId = event.dataTransfer.getData('application/x-cowart-image-id') || event.dataTransfer.getData('text/plain')
-    if (imageId && images.some((image) => image.id === imageId)) {
-      addCanvasReferenceImage(imageId, slotIndex)
-      return
-    }
-
-    setStatus(tr('没有识别到素材图片。可以先把图片导入左侧，再拖到这个素材槽。', 'No reference image was detected. Import the image on the left first, then drag it into this slot.'))
+    void importDataTransferAsReference(event.dataTransfer, slotIndex)
   }
 
   const exportTask = () => {
