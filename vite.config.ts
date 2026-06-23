@@ -58,6 +58,7 @@ type CodexTaskRequest = {
 }
 
 type VideoProvider = 'kling' | 'volcengine' | 'wanxiang' | 'runway' | 'luma' | 'fal' | 'replicate'
+type ImageProvider = 'fal' | 'wanxiang' | 'volcengine' | 'kling'
 type VideoTaskStatus = 'needs_config' | 'submitted' | 'provider_error' | 'ready' | 'saved'
 
 type VideoTaskRequest = {
@@ -82,6 +83,10 @@ type VideoTaskRequest = {
   aspectRatio?: string
   resolution?: string
   mode?: string
+}
+
+type ImageTaskRequest = CodexTaskRequest & {
+  provider?: ImageProvider
 }
 
 type VideoTaskSummary = {
@@ -109,6 +114,11 @@ type VideoTaskSummary = {
 
 type VideoConfigRequest = {
   provider?: VideoProvider
+  values?: Record<string, unknown>
+}
+
+type ImageConfigRequest = {
+  provider?: ImageProvider
   values?: Record<string, unknown>
 }
 
@@ -149,7 +159,17 @@ const videoProviderNames: Record<VideoProvider, string> = {
 }
 
 const videoProviderIds: VideoProvider[] = ['kling', 'volcengine', 'wanxiang', 'runway', 'luma', 'fal', 'replicate']
+const imageProviderNames: Record<ImageProvider, string> = {
+  fal: 'fal.ai',
+  wanxiang: '阿里万象',
+  volcengine: '火山方舟',
+  kling: '可灵',
+}
+const imageProviderIds: ImageProvider[] = ['fal', 'wanxiang', 'volcengine', 'kling']
 const defaultArkVideoModel = 'doubao-seedance-2-0-260128'
+const defaultArkImageModel = 'doubao-seedream-4-0-250828'
+const defaultFalImageModel = 'fal-ai/flux-pro/kontext/max'
+const defaultDashScopeImageModel = 'qwen-image-edit'
 
 const videoConfigFields: Record<VideoProvider, VideoConfigField[]> = {
   kling: [
@@ -191,7 +211,33 @@ const videoConfigFields: Record<VideoProvider, VideoConfigField[]> = {
   ],
 }
 
+const imageConfigFields: Record<ImageProvider, VideoConfigField[]> = {
+  fal: [
+    { key: 'FAL_KEY', label: 'API Key', secret: true },
+    { key: 'FAL_IMAGE_MODEL', label: '图片模型路径', placeholder: defaultFalImageModel },
+    { key: 'FAL_IMAGE_ENDPOINT', label: '图片接口地址', placeholder: `https://fal.run/${defaultFalImageModel}` },
+  ],
+  wanxiang: [
+    { key: 'DASHSCOPE_API_KEY', label: 'API Key', secret: true },
+    { key: 'DASHSCOPE_IMAGE_MODEL', label: '图片模型', placeholder: defaultDashScopeImageModel },
+    { key: 'DASHSCOPE_IMAGE_ENDPOINT', label: '图片接口地址', placeholder: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation' },
+  ],
+  volcengine: [
+    { key: 'ARK_API_KEY', label: 'API Key', secret: true },
+    { key: 'ARK_IMAGE_MODEL', label: '图片模型', placeholder: defaultArkImageModel },
+    { key: 'ARK_IMAGE_ENDPOINT', label: '图片接口地址', placeholder: 'https://ark.cn-beijing.volces.com/api/v3/images/generations' },
+  ],
+  kling: [
+    { key: 'KLING_ACCESS_KEY', label: 'Access Key', secret: true },
+    { key: 'KLING_SECRET_KEY', label: 'Secret Key', secret: true },
+    { key: 'KLING_IMAGE_MODEL', label: '图片模型', placeholder: 'kling-image-v1' },
+    { key: 'KLING_IMAGE_ENDPOINT', label: '图片接口地址', placeholder: 'https://api.klingai.com/v1/images/generations' },
+  ],
+}
+
 const managedVideoEnvKeys = Array.from(new Set(Object.values(videoConfigFields).flatMap((fields) => fields.map((field) => field.key))))
+const managedImageEnvKeys = Array.from(new Set(Object.values(imageConfigFields).flatMap((fields) => fields.map((field) => field.key))))
+const managedConfigEnvKeys = Array.from(new Set([...managedVideoEnvKeys, ...managedImageEnvKeys]))
 
 function sendJson(res: ServerResponse, payload: unknown) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -296,18 +342,18 @@ function writeEnvLocal(values: Record<string, string>) {
     .split(/\r?\n/)
     .filter((line) => {
       const key = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/)?.[1]
-      return line.trim() !== '# Cowart video API settings' && (!key || !managedVideoEnvKeys.includes(key))
+      return !['# Cowart video API settings', '# Cowart API settings'].includes(line.trim()) && (!key || !managedConfigEnvKeys.includes(key))
     })
     .filter((line, index, lines) => line.trim() || lines[index - 1]?.trim())
 
-  const managedLines = managedVideoEnvKeys
+  const managedLines = managedConfigEnvKeys
     .filter((key) => values[key])
     .map((key) => `${key}=${quoteEnvValue(values[key] ?? '')}`)
 
   const nextLines = [...preservedLines]
   if (managedLines.length > 0) {
     if (nextLines.length > 0 && nextLines.at(-1)?.trim()) nextLines.push('')
-    nextLines.push('# Cowart video API settings', ...managedLines)
+    nextLines.push('# Cowart API settings', ...managedLines)
   }
 
   if (nextLines.length === 0) {
@@ -320,7 +366,7 @@ function writeEnvLocal(values: Record<string, string>) {
 }
 
 function syncProcessEnv(values: Record<string, string>) {
-  for (const key of managedVideoEnvKeys) {
+  for (const key of managedConfigEnvKeys) {
     if (values[key]) {
       process.env[key] = values[key]
     } else {
@@ -332,11 +378,15 @@ function syncProcessEnv(values: Record<string, string>) {
 function getVideoEnvValues() {
   const fileValues = readEnvLocal()
   const values: Record<string, string> = {}
-  for (const key of managedVideoEnvKeys) {
+  for (const key of managedConfigEnvKeys) {
     values[key] = fileValues[key] ?? process.env[key] ?? ''
   }
   syncProcessEnv(values)
   return values
+}
+
+function getImageEnvValues() {
+  return getVideoEnvValues()
 }
 
 function buildVideoConfigResponse() {
@@ -358,7 +408,7 @@ function saveVideoConfig(provider: VideoProvider, incomingValues: Record<string,
   const storedValues = readEnvLocal()
   const currentValues: Record<string, string> = {}
   const preservedRuntimeSecretKeys = new Set<string>()
-  for (const key of managedVideoEnvKeys) {
+  for (const key of managedConfigEnvKeys) {
     if (storedValues[key]) currentValues[key] = storedValues[key]
   }
 
@@ -390,6 +440,59 @@ function saveVideoConfig(provider: VideoProvider, incomingValues: Record<string,
   }
 
   return buildVideoConfigResponse()
+}
+
+function buildImageConfigResponse() {
+  const values = getImageEnvValues()
+  return {
+    providers: imageProviderIds.map((id) => ({
+      id,
+      name: imageProviderNames[id],
+      fields: imageConfigFields[id].map((field) => ({
+        ...field,
+        configured: Boolean(values[field.key]),
+        value: field.secret ? '' : values[field.key] || '',
+      })),
+    })),
+  }
+}
+
+function saveImageConfig(provider: ImageProvider, incomingValues: Record<string, unknown>) {
+  const storedValues = readEnvLocal()
+  const currentValues: Record<string, string> = {}
+  const preservedRuntimeSecretKeys = new Set<string>()
+  for (const key of managedConfigEnvKeys) {
+    if (storedValues[key]) currentValues[key] = storedValues[key]
+  }
+
+  for (const field of imageConfigFields[provider]) {
+    const rawValue = incomingValues[field.key]
+    if (typeof rawValue !== 'string') continue
+
+    const value = rawValue.trim()
+    if (!value && field.secret && (currentValues[field.key] || process.env[field.key])) {
+      if (!currentValues[field.key] && process.env[field.key]) preservedRuntimeSecretKeys.add(field.key)
+      continue
+    }
+    if (value) {
+      currentValues[field.key] = value
+    } else {
+      delete currentValues[field.key]
+    }
+  }
+
+  writeEnvLocal(currentValues)
+  for (const field of imageConfigFields[provider]) {
+    if (currentValues[field.key]) {
+      process.env[field.key] = currentValues[field.key]
+    } else if (preservedRuntimeSecretKeys.has(field.key)) {
+      continue
+    } else if (Object.prototype.hasOwnProperty.call(incomingValues, field.key)) {
+      delete process.env[field.key]
+    }
+  }
+
+  return buildImageConfigResponse()
 }
 
 function presentEnv(names: string[]) {
@@ -439,6 +542,10 @@ function isVideoProvider(value: unknown): value is VideoProvider {
   return typeof value === 'string' && videoProviderIds.includes(value as VideoProvider)
 }
 
+function isImageProvider(value: unknown): value is ImageProvider {
+  return typeof value === 'string' && imageProviderIds.includes(value as ImageProvider)
+}
+
 function readJsonFile(filePath: string): unknown {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'))
@@ -455,6 +562,96 @@ function looksLikeVideoUrl(value: string, parentKey = '') {
 
   const lowerKey = parentKey.toLowerCase()
   return ['video', 'video_url', 'url', 'output', 'file', 'download', 'asset'].some((key) => lowerKey.includes(key))
+}
+
+function looksLikeImageUrl(value: string, parentKey = '') {
+  if (/^data:image\/[a-z0-9+.-]+;base64,/i.test(value)) return true
+  if (!/^https?:\/\//i.test(value)) return false
+
+  const lowerUrl = value.toLowerCase().split('?')[0] ?? ''
+  if (/\.(avif|gif|jpe?g|png|svg|webp)$/.test(lowerUrl)) return true
+
+  const lowerKey = parentKey.toLowerCase()
+  return ['image', 'image_url', 'imageurl', 'url', 'output', 'result', 'file', 'asset'].some((key) => lowerKey.includes(key))
+}
+
+function extractImageUrl(payload: unknown, parentKey = '', seen = new Set<unknown>()): string | undefined {
+  if (typeof payload === 'string') return looksLikeImageUrl(payload, parentKey) ? payload : undefined
+  if (!payload || typeof payload !== 'object') return undefined
+  if (seen.has(payload)) return undefined
+  seen.add(payload)
+
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const nested = extractImageUrl(item, parentKey, seen)
+      if (nested) return nested
+    }
+    return undefined
+  }
+
+  const record = payload as Record<string, unknown>
+  const preferredKeys = [
+    'image_url',
+    'imageUrl',
+    'images',
+    'image',
+    'url',
+    'download_url',
+    'downloadUrl',
+    'output',
+    'outputs',
+    'result',
+    'results',
+    'file',
+    'files',
+  ]
+  for (const key of preferredKeys) {
+    if (!Object.prototype.hasOwnProperty.call(record, key)) continue
+    const nested = extractImageUrl(record[key], key, seen)
+    if (nested) return nested
+  }
+
+  for (const [key, value] of Object.entries(record)) {
+    const nested = extractImageUrl(value, key, seen)
+    if (nested) return nested
+  }
+
+  return undefined
+}
+
+function extractImageBase64(payload: unknown, parentKey = '', seen = new Set<unknown>()): string | undefined {
+  if (typeof payload === 'string') {
+    if (/^data:image\/[a-z0-9+.-]+;base64,/i.test(payload)) return payload
+    const normalized = payload.trim()
+    const lowerKey = parentKey.toLowerCase()
+    if (/^[A-Za-z0-9+/=\s]+$/.test(normalized) && normalized.length > 200 && /(b64|base64|image)/i.test(lowerKey)) return normalized
+    return undefined
+  }
+  if (!payload || typeof payload !== 'object') return undefined
+  if (seen.has(payload)) return undefined
+  seen.add(payload)
+
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const nested = extractImageBase64(item, parentKey, seen)
+      if (nested) return nested
+    }
+    return undefined
+  }
+
+  const record = payload as Record<string, unknown>
+  for (const key of ['b64_json', 'base64', 'image_base64', 'imageBase64', 'data']) {
+    if (!Object.prototype.hasOwnProperty.call(record, key)) continue
+    const nested = extractImageBase64(record[key], key, seen)
+    if (nested) return nested
+  }
+
+  for (const [key, value] of Object.entries(record)) {
+    const nested = extractImageBase64(value, key, seen)
+    if (nested) return nested
+  }
+
+  return undefined
 }
 
 function extractVideoUrl(payload: unknown, parentKey = '', seen = new Set<unknown>()): string | undefined {
@@ -863,6 +1060,188 @@ function buildProviderRequest(provider: VideoProvider, task: VideoTaskRequest, i
   }
 
   return { providerName, missingEnv: ['UNSUPPORTED_VIDEO_PROVIDER'] }
+}
+
+function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskRequest, image: PreparedVideoImage, references: PreparedVideoImage[]): ProviderRequest {
+  const providerName = imageProviderNames[provider]
+  const guidance = buildStrictImageEditGuidance(task.annotations, references.length > 0)
+  const annotationText = getAnnotationNoteText(task.annotations)
+  const prompt = [
+    task.editPrompt?.trim() || '请基于这张图片进行局部修改。',
+    '',
+    '画布标注：',
+    annotationText || '没有文字标注，请按补充说明改图。',
+    '',
+    '生成约束：',
+    ...guidance.map((line) => `- ${line}`),
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  if (provider === 'fal') {
+    const missingEnv = presentEnv(['FAL_KEY'])
+    if (missingEnv.length > 0) return { providerName, missingEnv }
+
+    const model = process.env.FAL_IMAGE_MODEL || defaultFalImageModel
+    return {
+      providerName,
+      missingEnv,
+      endpoint: process.env.FAL_IMAGE_ENDPOINT || `https://fal.run/${model}`,
+      headers: {
+        Authorization: `Key ${process.env.FAL_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: {
+        prompt,
+        image_url: image.dataUrl,
+        reference_image_urls: references.map((reference) => reference.dataUrl),
+        num_images: 1,
+        output_format: 'png',
+      },
+    }
+  }
+
+  if (provider === 'wanxiang') {
+    const missingEnv = presentEnv(['DASHSCOPE_API_KEY'])
+    if (missingEnv.length > 0) return { providerName, missingEnv }
+
+    return {
+      providerName,
+      missingEnv,
+      endpoint: process.env.DASHSCOPE_IMAGE_ENDPOINT || 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+      headers: {
+        Authorization: `Bearer ${process.env.DASHSCOPE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: {
+        model: process.env.DASHSCOPE_IMAGE_MODEL || defaultDashScopeImageModel,
+        input: {
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { image: image.dataUrl },
+                ...references.map((reference) => ({ image: reference.dataUrl })),
+                { text: prompt },
+              ],
+            },
+          ],
+        },
+        parameters: {
+          n: 1,
+          prompt_extend: false,
+          watermark: false,
+        },
+      },
+    }
+  }
+
+  if (provider === 'volcengine') {
+    const missingEnv = presentEnv(['ARK_API_KEY'])
+    if (missingEnv.length > 0) return { providerName, missingEnv }
+
+    const inputImages = [image.dataUrl, ...references.map((reference) => reference.dataUrl)]
+    return {
+      providerName,
+      missingEnv,
+      endpoint: process.env.ARK_IMAGE_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+      headers: {
+        Authorization: `Bearer ${process.env.ARK_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: {
+        model: process.env.ARK_IMAGE_MODEL || defaultArkImageModel,
+        prompt,
+        image: image.dataUrl,
+        images: inputImages,
+        response_format: 'url',
+        size: 'adaptive',
+        watermark: false,
+      },
+    }
+  }
+
+  if (provider === 'kling') {
+    const missingEnv = presentEnv(['KLING_ACCESS_KEY', 'KLING_SECRET_KEY'])
+    if (missingEnv.length > 0) return { providerName, missingEnv }
+
+    const accessKey = process.env.KLING_ACCESS_KEY ?? ''
+    const secretKey = process.env.KLING_SECRET_KEY ?? ''
+    return {
+      providerName,
+      missingEnv,
+      endpoint: process.env.KLING_IMAGE_ENDPOINT || `${process.env.KLING_BASE_URL || 'https://api.klingai.com'}/v1/images/generations`,
+      headers: {
+        Authorization: `Bearer ${createKlingToken(accessKey, secretKey)}`,
+        'Content-Type': 'application/json',
+      },
+      body: {
+        model_name: process.env.KLING_IMAGE_MODEL || 'kling-image-v1',
+        prompt,
+        image: image.base64,
+        reference_images: references.map((reference) => reference.base64),
+      },
+    }
+  }
+
+  return { providerName, missingEnv: ['UNSUPPORTED_IMAGE_PROVIDER'] }
+}
+
+function extensionForImageResponse(contentType: string | null, url = '') {
+  const normalized = (contentType ?? '').split(';')[0]?.trim().toLowerCase()
+  const extensionFromMime = Object.entries(imageMimeTypes).find(([, mimeType]) => mimeType === normalized)?.[0]
+  if (extensionFromMime) return extensionFromMime
+
+  try {
+    const extension = path.extname(new URL(url).pathname).toLowerCase()
+    if (imageMimeTypes[extension]) return extension
+  } catch {
+    return '.png'
+  }
+
+  return '.png'
+}
+
+function decodeImagePayload(value: string) {
+  const dataUrlMatch = value.match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i)
+  const mimeType = dataUrlMatch?.[1]?.toLowerCase() ?? 'image/png'
+  const base64 = dataUrlMatch?.[2] ?? value
+  const buffer = Buffer.from(base64.replace(/\s/g, ''), 'base64')
+  if (buffer.length === 0) return null
+  return { mimeType, buffer }
+}
+
+async function saveProviderImageOutput(directory: string, payload: unknown) {
+  const encodedImage = extractImageBase64(payload)
+  if (encodedImage) {
+    const decoded = decodeImagePayload(encodedImage)
+    if (decoded) {
+      const outputPath = path.join(directory, `result${extensionForMime(decoded.mimeType)}`)
+      fs.writeFileSync(outputPath, decoded.buffer)
+      return { resultImagePath: outputPath, resultImageUrl: `/api/local-image?path=${encodeURIComponent(outputPath)}` }
+    }
+  }
+
+  const imageUrl = extractImageUrl(payload)
+  if (!imageUrl) return {}
+  if (/^data:image\//i.test(imageUrl)) {
+    const decoded = decodeImagePayload(imageUrl)
+    if (!decoded) return {}
+    const outputPath = path.join(directory, `result${extensionForMime(decoded.mimeType)}`)
+    fs.writeFileSync(outputPath, decoded.buffer)
+    return { resultImagePath: outputPath, resultImageUrl: `/api/local-image?path=${encodeURIComponent(outputPath)}`, providerImageUrl: imageUrl }
+  }
+
+  const response = await fetch(imageUrl)
+  if (!response.ok) return { providerImageUrl: imageUrl }
+
+  const buffer = Buffer.from(await response.arrayBuffer())
+  if (buffer.length === 0) return { providerImageUrl: imageUrl }
+
+  const extension = extensionForImageResponse(response.headers.get('content-type'), imageUrl)
+  const outputPath = path.join(directory, `result${extension}`)
+  fs.writeFileSync(outputPath, buffer)
+  return { resultImagePath: outputPath, resultImageUrl: `/api/local-image?path=${encodeURIComponent(outputPath)}`, providerImageUrl: imageUrl }
 }
 
 async function postProviderJson(endpoint: string, headers: Record<string, string>, body: unknown) {
@@ -1518,6 +1897,183 @@ function localImageImportPlugin(): PluginOption {
         } catch (error) {
           res.statusCode = 500
           sendJson(res, { error: error instanceof Error ? error.message : 'Could not create Codex task' })
+        }
+      })
+
+      server.middlewares.use('/api/image-config', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        try {
+          if (req.method === 'GET') {
+            sendJson(res, buildImageConfigResponse())
+            return
+          }
+
+          if (req.method !== 'POST') {
+            res.statusCode = 405
+            sendJson(res, { error: 'Method not allowed' })
+            return
+          }
+
+          const body = (await readJsonBody(req, 1024 * 1024)) as ImageConfigRequest
+          const provider = body.provider ?? 'fal'
+          if (!imageProviderIds.includes(provider)) {
+            res.statusCode = 400
+            sendJson(res, { error: 'Unsupported image provider' })
+            return
+          }
+
+          sendJson(res, saveImageConfig(provider, body.values ?? {}))
+        } catch (error) {
+          res.statusCode = 500
+          sendJson(res, { error: error instanceof Error ? error.message : 'Could not save image config' })
+        }
+      })
+
+      server.middlewares.use('/api/image-generation', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          sendJson(res, { error: 'Method not allowed' })
+          return
+        }
+
+        try {
+          const body = (await readJsonBody(req, 96 * 1024 * 1024)) as ImageTaskRequest
+          const provider = body.provider ?? 'fal'
+          if (!isImageProvider(provider)) {
+            res.statusCode = 400
+            sendJson(res, { error: 'Unsupported image provider' })
+            return
+          }
+
+          const image = parseImageDataUrl(body.imageDataUrl)
+          if (!image) {
+            res.statusCode = 400
+            sendJson(res, { error: 'Missing image data' })
+            return
+          }
+
+          const title = body.image?.title || 'image-api-task'
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+          const directory = path.join(process.cwd(), 'codex-image-tasks', `${stamp}-${provider}-${safeSlug(title)}`)
+          fs.mkdirSync(directory, { recursive: true })
+
+          const imagePath = path.join(directory, `source${extensionForMime(image.mimeType)}`)
+          const requestPath = path.join(directory, 'request.json')
+          const providerRequestPath = path.join(directory, 'provider-request.json')
+          const providerResponsePath = path.join(directory, 'provider-response.json')
+          const promptPath = path.join(directory, 'prompt.txt')
+          fs.writeFileSync(imagePath, image.buffer)
+
+          const referenceRequests = Array.isArray(body.references) ? body.references : []
+          const referenceDataUrls = Array.isArray(body.referenceImageDataUrls) ? body.referenceImageDataUrls : []
+          const preparedReferences = referenceDataUrls
+            .slice(0, 8)
+            .map((dataUrl) => parseImageDataUrl(dataUrl))
+            .filter((reference): reference is PreparedVideoImage => Boolean(reference))
+          const savedReferences = preparedReferences.map((reference, index) => {
+            const referenceRequest = referenceRequests[index]
+            const label = referenceRequest?.label || `素材 ${index + 1}`
+            const referenceImagePath = path.join(directory, `reference-${index + 1}${extensionForMime(reference.mimeType)}`)
+            fs.writeFileSync(referenceImagePath, reference.buffer)
+            return {
+              label,
+              title: referenceRequest?.image?.title || label,
+              imagePath: referenceImagePath,
+              image: referenceRequest?.image,
+            }
+          })
+
+          const editPrompt = body.editPrompt || '请基于这张图片继续改图。'
+          const promptText = [
+            editPrompt,
+            '',
+            'API 生图参数：',
+            `- 平台：${imageProviderNames[provider]}`,
+            ...buildStrictImageEditGuidance(body.annotations, savedReferences.length > 0).map((line) => `- ${line}`),
+          ].join('\n')
+          fs.writeFileSync(promptPath, promptText)
+
+          writeJson(requestPath, {
+            provider,
+            providerName: imageProviderNames[provider],
+            image: {
+              ...body.image,
+              savedImagePath: imagePath,
+            },
+            references: savedReferences,
+            annotations: body.annotations ?? [],
+            editPrompt,
+            promptPath,
+            createdAt: new Date().toISOString(),
+          })
+
+          const providerRequest = buildImageProviderRequest(provider, body, image, preparedReferences)
+          writeJson(providerRequestPath, {
+            provider,
+            providerName: providerRequest.providerName,
+            missingEnv: providerRequest.missingEnv,
+            endpoint: providerRequest.endpoint,
+            referenceImagePaths: savedReferences.map((reference) => reference.imagePath),
+            body: providerRequest.body,
+          })
+
+          if (providerRequest.missingEnv.length > 0 || !providerRequest.endpoint || !providerRequest.headers || !providerRequest.body) {
+            sendJson(res, {
+              status: 'needs_config',
+              provider,
+              providerName: providerRequest.providerName,
+              missingEnv: providerRequest.missingEnv,
+              directory,
+              imagePath,
+              requestPath,
+              promptPath,
+              providerRequestPath,
+            })
+            return
+          }
+
+          const providerResponse = await postProviderJson(providerRequest.endpoint, providerRequest.headers, providerRequest.body)
+          const savedOutput = providerResponse.ok ? await saveProviderImageOutput(directory, providerResponse.payload) : {}
+          writeJson(providerResponsePath, {
+            status: providerResponse.status,
+            ok: providerResponse.ok,
+            createdAt: new Date().toISOString(),
+            payload: providerResponse.payload,
+            ...savedOutput,
+          })
+
+          if (!providerResponse.ok) {
+            res.statusCode = 502
+            sendJson(res, {
+              status: 'provider_error',
+              error: sanitizeProviderError(extractProviderError(providerResponse.payload)) || `${providerRequest.providerName} 返回 ${providerResponse.status}`,
+              provider,
+              providerName: providerRequest.providerName,
+              directory,
+              imagePath,
+              requestPath,
+              promptPath,
+              providerRequestPath,
+              providerResponsePath,
+            })
+            return
+          }
+
+          sendJson(res, {
+            status: savedOutput.resultImagePath ? 'ready' : 'submitted',
+            provider,
+            providerName: providerRequest.providerName,
+            providerTaskId: extractProviderTaskId(providerResponse.payload),
+            directory,
+            imagePath,
+            requestPath,
+            promptPath,
+            providerRequestPath,
+            providerResponsePath,
+            ...savedOutput,
+          })
+        } catch (error) {
+          res.statusCode = 500
+          sendJson(res, { error: error instanceof Error ? error.message : 'Could not create image task' })
         }
       })
 

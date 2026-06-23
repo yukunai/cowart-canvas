@@ -2,7 +2,7 @@
 
 **Languages:** [English](README.md) | [简体中文](README.zh-CN.md)
 
-Cowart Canvas is a local browser canvas for marking exactly where an AI image should be edited, then turning those visual notes into a Codex-ready request. It also includes a local image-to-video task panel with front-end API settings and video history.
+Cowart Canvas is a local browser canvas for marking exactly where an AI image should be edited, then turning those visual notes into a Codex-ready request or a direct image-edit API call. It also includes a local image-to-video task panel with front-end API settings and video history.
 
 The interface is bilingual: Chinese and English are both built in, and users can switch languages from the top-left toolbar.
 
@@ -45,6 +45,7 @@ The app runs on your own machine. Imported images, generated task files, video t
 - Choose annotation color, shape style, and S/M/L/XL defaults.
 - Add up to three extra reference canvases below the main image for product/object/style references.
 - Read all canvas notes into a structured Codex edit prompt.
+- Send the annotated image task directly to image generation/editing APIs for fal.ai, Alibaba Wanxiang, Volcengine Ark, and Kling.
 - Switch the full interface between Chinese and English.
 - Create image-to-video tasks from 1 to 5 reference images.
 - Configure video provider API keys in the front-end settings panel or `.env.local`.
@@ -119,9 +120,20 @@ The app cannot directly read private images from a ChatGPT conversation in the c
 4. Drag the small bottom-right handle on a text/pin note to enlarge the box and font.
 5. Optional: click `Add Canvas` to add one reference slot at a time, up to three.
 6. Add notes in `Extra Notes`.
-7. Click `Send to Codex` to export a structured task and copy the Codex instruction.
+7. Click `Generate/Edit With API` to submit the marked task to a configured image provider, or click `Send to Codex` to export a structured task and copy the Codex instruction.
 
 Generated task files are written under `codex-image-tasks/`. This directory is ignored by git.
+
+## Image API Editing
+
+The edit canvas can submit the current main image, annotations, extra notes, and up to three reference canvases to these image providers:
+
+- fal.ai
+- Alibaba DashScope / Wanxiang
+- Volcengine Ark
+- Kling
+
+Provider keys, model names, and endpoints can be saved from the front-end `Image API Generation` settings panel. If a provider returns an image immediately, Cowart saves it under `codex-image-tasks/` and imports it back into `Image Results`. If a provider only returns a task ID, Cowart stores the provider response and task folder so you can inspect or retry it.
 
 ## Image To Video
 
@@ -141,11 +153,11 @@ Video task files are written under `video-tasks/`. This directory is ignored by 
 
 ## API Settings
 
-You can configure video APIs in two ways.
+You can configure image and video APIs in two ways.
 
 Option 1: use the app UI:
 
-1. Open `Video`.
+1. Open `Edit Canvas` for image APIs, or `Video` for video APIs.
 2. Click `API Settings`.
 3. Select a provider.
 4. Fill the keys and optional model/endpoint fields.

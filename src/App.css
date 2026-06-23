@@ -357,6 +357,15 @@ textarea {
   background: #fbfcfe;
 }
 
+.image-api-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dbe4ee;
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 10px;
+}
+
 .video-block-header,
 .api-settings-title {
   display: flex;
