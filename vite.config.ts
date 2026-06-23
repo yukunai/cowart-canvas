@@ -168,8 +168,8 @@ const imageProviderNames: Record<ImageProvider, string> = {
 const imageProviderIds: ImageProvider[] = ['fal', 'wanxiang', 'volcengine', 'kling']
 const defaultArkVideoModel = 'doubao-seedance-2-0-260128'
 const defaultArkImageModel = 'doubao-seedream-4-0-250828'
-const defaultFalImageModel = 'fal-ai/flux-pro/kontext/max'
-const defaultDashScopeImageModel = 'qwen-image-edit'
+const defaultFalImageModel = 'fal-ai/flux-pro/kontext/max/multi'
+const defaultDashScopeImageModel = 'wan2.7-image-pro'
 
 const videoConfigFields: Record<VideoProvider, VideoConfigField[]> = {
   kling: [
@@ -1083,6 +1083,8 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
     if (missingEnv.length > 0) return { providerName, missingEnv }
 
     const model = process.env.FAL_IMAGE_MODEL || defaultFalImageModel
+    const imageUrls = [image.dataUrl, ...references.map((reference) => reference.dataUrl)]
+    const isMultiImageModel = /\/multi(?:$|\/)/i.test(model)
     return {
       providerName,
       missingEnv,
@@ -1093,8 +1095,7 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
       },
       body: {
         prompt,
-        image_url: image.dataUrl,
-        reference_image_urls: references.map((reference) => reference.dataUrl),
+        ...(isMultiImageModel ? { image_urls: imageUrls } : { image_url: image.dataUrl, reference_image_urls: references.map((reference) => reference.dataUrl) }),
         num_images: 1,
         output_format: 'png',
       },
@@ -1120,16 +1121,16 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
             {
               role: 'user',
               content: [
+                { text: prompt },
                 { image: image.dataUrl },
                 ...references.map((reference) => ({ image: reference.dataUrl })),
-                { text: prompt },
               ],
             },
           ],
         },
         parameters: {
           n: 1,
-          prompt_extend: false,
+          size: '2K',
           watermark: false,
         },
       },
@@ -1242,6 +1243,32 @@ async function saveProviderImageOutput(directory: string, payload: unknown) {
   const outputPath = path.join(directory, `result${extension}`)
   fs.writeFileSync(outputPath, buffer)
   return { resultImagePath: outputPath, resultImageUrl: `/api/local-image?path=${encodeURIComponent(outputPath)}`, providerImageUrl: imageUrl }
+}
+
+function buildDashScopeImageTaskEndpoint(taskId: string) {
+  const explicitEndpoint = process.env.DASHSCOPE_IMAGE_TASK_ENDPOINT || process.env.DASHSCOPE_TASK_ENDPOINT
+  if (explicitEndpoint) return explicitEndpoint.replace(/\{task_id\}|\{taskId\}/g, encodeURIComponent(taskId))
+
+  return `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
+}
+
+async function pollDashScopeImageTask(taskId: string) {
+  const apiKey = process.env.DASHSCOPE_API_KEY
+  if (!apiKey) return null
+
+  let latest: Awaited<ReturnType<typeof getProviderJson>> | null = null
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 3000))
+    latest = await getProviderJson(buildDashScopeImageTaskEndpoint(taskId), {
+      Authorization: `Bearer ${apiKey}`,
+    })
+
+    const status = extractProviderTaskStatus(latest.payload)
+    const hasImage = extractImageUrl(latest.payload) || extractImageBase64(latest.payload)
+    if (hasImage || isProviderFailureStatus(status)) break
+  }
+
+  return latest
 }
 
 async function postProviderJson(endpoint: string, headers: Record<string, string>, body: unknown) {
@@ -2032,20 +2059,30 @@ function localImageImportPlugin(): PluginOption {
           }
 
           const providerResponse = await postProviderJson(providerRequest.endpoint, providerRequest.headers, providerRequest.body)
-          const savedOutput = providerResponse.ok ? await saveProviderImageOutput(directory, providerResponse.payload) : {}
+          let finalProviderResponse = providerResponse
+          let savedOutput = providerResponse.ok ? await saveProviderImageOutput(directory, providerResponse.payload) : {}
+          const initialTaskId = extractProviderTaskId(providerResponse.payload)
+          if (provider === 'wanxiang' && providerResponse.ok && !savedOutput.resultImagePath && initialTaskId) {
+            const polledResponse = await pollDashScopeImageTask(initialTaskId)
+            if (polledResponse) {
+              finalProviderResponse = polledResponse
+              savedOutput = polledResponse.ok ? await saveProviderImageOutput(directory, polledResponse.payload) : savedOutput
+            }
+          }
           writeJson(providerResponsePath, {
-            status: providerResponse.status,
-            ok: providerResponse.ok,
+            status: finalProviderResponse.status,
+            ok: finalProviderResponse.ok,
             createdAt: new Date().toISOString(),
-            payload: providerResponse.payload,
+            payload: finalProviderResponse.payload,
+            previousPayload: finalProviderResponse === providerResponse ? undefined : providerResponse.payload,
             ...savedOutput,
           })
 
-          if (!providerResponse.ok) {
+          if (!finalProviderResponse.ok) {
             res.statusCode = 502
             sendJson(res, {
               status: 'provider_error',
-              error: sanitizeProviderError(extractProviderError(providerResponse.payload)) || `${providerRequest.providerName} 返回 ${providerResponse.status}`,
+              error: sanitizeProviderError(extractProviderError(finalProviderResponse.payload)) || `${providerRequest.providerName} 返回 ${finalProviderResponse.status}`,
               provider,
               providerName: providerRequest.providerName,
               directory,
@@ -2062,7 +2099,7 @@ function localImageImportPlugin(): PluginOption {
             status: savedOutput.resultImagePath ? 'ready' : 'submitted',
             provider,
             providerName: providerRequest.providerName,
-            providerTaskId: extractProviderTaskId(providerResponse.payload),
+            providerTaskId: extractProviderTaskId(finalProviderResponse.payload) ?? initialTaskId,
             directory,
             imagePath,
             requestPath,
