@@ -1083,16 +1083,28 @@ function textMentionsEyewearRemoval(text: string) {
   return /(眼镜|眼境|墨镜|太阳镜|glasses|sunglasses|eyeglasses|eyewear)/i.test(text) && /(去掉|取掉|去除|移除|删除|不要|摘掉|remove|erase|delete|without)/i.test(text)
 }
 
+function textMentionsClothingChange(text: string) {
+  return /(衣服|服装|外套|夹克|皮衣|风衣|衬衫|上衣|换衣|换一件|coat|jacket|trench|clothing|outfit|shirt)/i.test(text) && /(换|改|替换|变成|穿|replace|change|wear)/i.test(text)
+}
+
 function buildStrictImageEditGuidance(annotations?: unknown[], hasReferences = false) {
+  const annotationNotes = getAnnotationNoteText(annotations)
   const lines = [
     '严格局部修补模式，不是整图重绘。',
+    '人物一致性是最高优先级；改图后人物必须和原人物至少达到 95% 以上相似度。如果人物一致性和其它改动冲突，优先保留原人物，只缩小改动范围。',
     '以原图作为底图，只修改画布标注位置和补充说明明确要求的区域；未标注区域尽量像素级保持不变。',
     '锁定主体位置、原始裁切、镜头距离、光线、背景、服装、发型、材质纹理、噪点和整体摄影质感。',
     '如果画面中有人，必须保持同一人物身份、脸型轮廓、头型、下巴、颧骨、鼻型、嘴型、耳朵、发际线、肤色、五官比例和表情；不要美化、不要换脸。',
+    '不要重绘整个头部或整张脸。除明确标注的脸部目标外，可见脸部必须沿用原图，包括脸宽、脸长、脸颊肉感、眼距、鼻翼宽度、嘴角和左右不对称特征。',
+    '交付前自检：如果脸型或人物相似度达不到 95% 以上，结果无效，必须缩小遮罩重新做更局部的编辑。',
   ]
 
-  if (textMentionsEyewearRemoval(getAnnotationNoteText(annotations))) {
-    lines.push('眼镜/墨镜移除规则：只移除镜片和镜框，并自然补出被遮挡的眼睛、眼皮、眉毛、鼻梁阴影和皮肤纹理；不要改变脸宽、脸长、头发、嘴巴、衣服或背景。')
+  if (textMentionsEyewearRemoval(annotationNotes)) {
+    lines.push('眼镜/墨镜移除规则：只移除镜片和镜框。只在眼镜覆盖范围内补出被遮挡的眼睛、眼皮、眉毛、鼻梁阴影和皮肤纹理；眼镜范围外的可见脸部必须沿用原图。')
+  }
+
+  if (textMentionsClothingChange(annotationNotes)) {
+    lines.push('换衣服规则：只替换原衣服和肩膀覆盖区域；换衣服时不要移动或重绘头部、脸、脖子位置、头发、耳朵或背景。')
   }
 
   if (hasReferences) {
