@@ -410,15 +410,6 @@
       }
 
       @media (max-width: 640px) {
-        .app {
-          grid-template-columns: 1fr;
-          height: auto;
-        }
-
-        .pane-resizer {
-          display: none;
-        }
-
         .editor-body {
           grid-template-columns: 1fr;
         }
@@ -836,6 +827,7 @@
         data.categories.unshift(category);
         activeCategoryId = category.id;
         activeNoteId = undefined;
+        editingCategoryId = category.id;
         saveNotebook();
         renderAll();
       }
@@ -917,8 +909,9 @@
         renderCategoryOptions();
         noteCreateCard.classList.add("open");
         noteCategorySelect.value = activeCategoryId || data.categories[0]?.id || "";
-        newNoteTitleInput.value = "";
+        newNoteTitleInput.value = "新笔记";
         newNoteTitleInput.focus();
+        newNoteTitleInput.select();
       }
 
       function hideAddNoteForm() {

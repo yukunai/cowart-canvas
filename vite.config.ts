@@ -426,12 +426,21 @@ function getNotebookIndexPath() {
   return path.join(getNotebookDirectory(), 'index.json')
 }
 
+function cleanupNotebookFolders(directory: string, keepFolders: Set<string>) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.isDirectory() || keepFolders.has(entry.name)) continue
+    fs.rmSync(path.join(directory, entry.name), { recursive: true, force: true })
+  }
+}
+
 function saveNotebookData(input: unknown): NotebookData & { storagePath: string; updatedAt: string } {
   const notebook = normalizeNotebookData(input)
   const directory = getNotebookDirectory()
   fs.mkdirSync(directory, { recursive: true })
+  const keepFolders = new Set<string>()
   const indexCategories = notebook.categories.map((category, categoryIndex) => {
     const categoryFolder = `${String(categoryIndex + 1).padStart(2, '0')}-${notebookSafeFileName(category.name, category.id)}`
+    keepFolders.add(categoryFolder)
     const categoryPath = path.join(directory, categoryFolder)
     fs.mkdirSync(categoryPath, { recursive: true })
     const notes = category.notes.map((note, noteIndex) => {
@@ -452,6 +461,7 @@ function saveNotebookData(input: unknown): NotebookData & { storagePath: string;
       notes,
     }
   })
+  cleanupNotebookFolders(directory, keepFolders)
   const index = {
     activeCategoryId: notebook.activeCategoryId,
     activeNoteId: notebook.activeNoteId,
