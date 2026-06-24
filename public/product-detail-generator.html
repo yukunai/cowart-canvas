@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cowart 商品详情页生成</title>
+    <title>Cowart 设计</title>
     <style>
       :root {
         color: #1f2937;
@@ -439,7 +439,7 @@
             <button type="button" id="videoButton">视频</button>
             <button type="button" id="canvasButton">画布</button>
           </div>
-          <p>专门给电商商品图生成详情页长图：上传主产品图和参考图，填写卖点、风格和模块结构。</p>
+          <p>上传主产品图和参考图，填写卖点、风格和模块结构。</p>
         </section>
 
         <section class="section">
@@ -516,7 +516,7 @@
             反向提示词（可选）
             <textarea id="negativePromptInput" placeholder="比如：不要低清、不要廉价感、不要文字乱码、不要夸张促销风、不要机械拼贴"></textarea>
           </label>
-          <button type="button" class="primary" id="generateButton">生成商品详情页</button>
+          <button type="button" class="primary" id="generateButton">生成设计图</button>
           <pre class="message" id="message">准备就绪。</pre>
         </section>
 
@@ -557,7 +557,7 @@
             <div id="heroResult" class="empty">还没有详情页。上传商品图并点击生成后，会直接展示在这里。</div>
             <section class="history">
               <div class="title-row">
-                <h2>历史商品详情图</h2>
+                <h2>历史设计图</h2>
                 <p id="historyCount">0 张</p>
               </div>
               <div class="history-grid" id="historyGrid"></div>
@@ -952,7 +952,7 @@
         const negativePrompt = negativePromptInput.value.trim();
         const editPrompt = [buildPrompt(), negativePrompt ? `反向提示词：${negativePrompt}` : ""].filter(Boolean).join("\n\n");
         const providerName = providers.find((item) => item.id === currentProvider)?.name || currentProvider;
-        setMessage(`正在提交到 ${providerName} 生成商品详情页...`);
+        setMessage(`正在提交到 ${providerName} 生成设计图...`);
         const response = await fetch(`${apiBase}/api/image-generation`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
