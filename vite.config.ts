@@ -35,6 +35,26 @@ type RecentImage = {
   url: string
 }
 
+type NotebookNote = {
+  id: string
+  title: string
+  content: string
+  updatedAt?: string
+  filePath?: string
+}
+
+type NotebookCategory = {
+  id: string
+  name: string
+  notes: NotebookNote[]
+}
+
+type NotebookData = {
+  activeCategoryId?: string
+  activeNoteId?: string
+  categories: NotebookCategory[]
+}
+
 type CodexTaskRequest = {
   image?: {
     title?: string
@@ -334,6 +354,150 @@ function parseImageDataUrl(dataUrl?: string): PreparedVideoImage | null {
 
 function writeJson(filePath: string, payload: unknown) {
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2))
+}
+
+function notebookSafeFileName(value: string, fallback: string) {
+  const normalized = value
+    .normalize('NFKC')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/[\n\r\t]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80)
+  return normalized || fallback
+}
+
+function getNotebookDirectory() {
+  return path.join(os.homedir(), '.cowart-canvas', 'text-notes')
+}
+
+function createDefaultNotebookData(): NotebookData {
+  const categoryId = `category-${Date.now()}`
+  const noteId = `note-${Date.now()}`
+  return {
+    activeCategoryId: categoryId,
+    activeNoteId: noteId,
+    categories: [
+      {
+        id: categoryId,
+        name: '默认分类',
+        notes: [
+          {
+            id: noteId,
+            title: '第一篇 Markdown',
+            content: '# 第一篇 Markdown\n\n- 可以建分类\n- 可以写多篇内容\n- 右侧会实时预览\n\n> 数据会保存到本机文件夹。',
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      },
+    ],
+  }
+}
+
+function normalizeNotebookData(value: unknown): NotebookData {
+  const record = isRecord(value) ? value : {}
+  const categoriesInput = Array.isArray(record.categories) ? record.categories : []
+  const categories = categoriesInput
+    .filter(isRecord)
+    .map((category, categoryIndex) => {
+      const notesInput = Array.isArray(category.notes) ? category.notes : []
+      const notes = notesInput.filter(isRecord).map((note, noteIndex) => ({
+        id: getString(note.id) || `note-${categoryIndex + 1}-${noteIndex + 1}`,
+        title: getString(note.title) || '未命名笔记',
+        content: getString(note.content) || '',
+        updatedAt: getString(note.updatedAt) || new Date().toISOString(),
+      }))
+      return {
+        id: getString(category.id) || `category-${categoryIndex + 1}`,
+        name: getString(category.name) || `分类 ${categoryIndex + 1}`,
+        notes,
+      }
+    })
+  return categories.length > 0
+    ? {
+        activeCategoryId: getString(record.activeCategoryId) || categories[0]?.id,
+        activeNoteId: getString(record.activeNoteId) || categories[0]?.notes[0]?.id,
+        categories,
+      }
+    : createDefaultNotebookData()
+}
+
+function getNotebookIndexPath() {
+  return path.join(getNotebookDirectory(), 'index.json')
+}
+
+function saveNotebookData(input: unknown): NotebookData & { storagePath: string; updatedAt: string } {
+  const notebook = normalizeNotebookData(input)
+  const directory = getNotebookDirectory()
+  fs.mkdirSync(directory, { recursive: true })
+  const indexCategories = notebook.categories.map((category, categoryIndex) => {
+    const categoryFolder = `${String(categoryIndex + 1).padStart(2, '0')}-${notebookSafeFileName(category.name, category.id)}`
+    const categoryPath = path.join(directory, categoryFolder)
+    fs.mkdirSync(categoryPath, { recursive: true })
+    const notes = category.notes.map((note, noteIndex) => {
+      const fileName = `${String(noteIndex + 1).padStart(3, '0')}-${notebookSafeFileName(note.title, note.id)}.md`
+      const notePath = path.join(categoryPath, fileName)
+      fs.writeFileSync(notePath, note.content || '', 'utf8')
+      return {
+        id: note.id,
+        title: note.title,
+        updatedAt: note.updatedAt || new Date().toISOString(),
+        filePath: notePath,
+      }
+    })
+    return {
+      id: category.id,
+      name: category.name,
+      folderPath: categoryPath,
+      notes,
+    }
+  })
+  const index = {
+    activeCategoryId: notebook.activeCategoryId,
+    activeNoteId: notebook.activeNoteId,
+    storagePath: directory,
+    updatedAt: new Date().toISOString(),
+    categories: indexCategories,
+  }
+  writeJson(getNotebookIndexPath(), index)
+  return loadNotebookData()
+}
+
+function loadNotebookData(): NotebookData & { storagePath: string; updatedAt: string } {
+  const directory = getNotebookDirectory()
+  const indexPath = getNotebookIndexPath()
+  if (!fs.existsSync(indexPath)) {
+    return saveNotebookData(createDefaultNotebookData())
+  }
+  const parsed = JSON.parse(fs.readFileSync(indexPath, 'utf8')) as unknown
+  const record = isRecord(parsed) ? parsed : {}
+  const categoriesInput = Array.isArray(record.categories) ? record.categories : []
+  const categories: NotebookCategory[] = categoriesInput.filter(isRecord).map((category, categoryIndex) => {
+    const notesInput = Array.isArray(category.notes) ? category.notes : []
+    const notes = notesInput.filter(isRecord).map((note, noteIndex) => {
+      const filePath = getString(note.filePath)
+      const content = filePath && fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : ''
+      return {
+        id: getString(note.id) || `note-${categoryIndex + 1}-${noteIndex + 1}`,
+        title: getString(note.title) || notebookSafeFileName(path.basename(filePath || '', '.md'), '未命名笔记'),
+        content,
+        updatedAt: getString(note.updatedAt) || (filePath ? new Date(fs.statSync(filePath).mtimeMs).toISOString() : new Date().toISOString()),
+        filePath,
+      }
+    })
+    return {
+      id: getString(category.id) || `category-${categoryIndex + 1}`,
+      name: getString(category.name) || `分类 ${categoryIndex + 1}`,
+      notes,
+    }
+  })
+  return {
+    activeCategoryId: getString(record.activeCategoryId) || categories[0]?.id,
+    activeNoteId: getString(record.activeNoteId) || categories[0]?.notes[0]?.id,
+    categories,
+    storagePath: directory,
+    updatedAt: getString(record.updatedAt) || new Date().toISOString(),
+  }
 }
 
 function parseEnvLocal(content: string) {
@@ -1880,6 +2044,25 @@ function localImageImportPlugin(): PluginOption {
         } catch {
           res.statusCode = 500
           sendJson(res, { images: [], error: 'Could not list recent downloaded images' })
+        }
+      })
+
+      server.middlewares.use('/api/notebook', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        try {
+          if (req.method === 'GET') {
+            sendJson(res, loadNotebookData())
+            return
+          }
+          if (req.method === 'POST') {
+            const body = await readJsonBody(req, 8 * 1024 * 1024)
+            sendJson(res, saveNotebookData(body))
+            return
+          }
+          res.statusCode = 405
+          sendJson(res, { error: 'Method not allowed' })
+        } catch (error) {
+          res.statusCode = 500
+          sendJson(res, { error: error instanceof Error ? error.message : 'Could not save notebook' })
         }
       })
 
