@@ -102,6 +102,22 @@
         gap: 10px;
       }
 
+      .mode-nav {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .mode-nav button {
+        padding: 0 10px;
+      }
+
+      .mode-nav button.active {
+        border-color: #1f6feb;
+        background: #eff6ff;
+        color: #185abc;
+      }
+
       h1 {
         margin: 0;
         font-size: 18px;
@@ -564,12 +580,14 @@
     <main class="app">
       <aside class="sidebar">
         <section class="header">
-          <div class="title-row">
+          <div>
             <h1>图片生成 / 改图</h1>
-            <div class="title-row">
-              <button type="button" id="productDetailButton">商品详情页</button>
-              <button type="button" id="backButton">回画布</button>
-            </div>
+          </div>
+          <div class="mode-nav">
+            <button type="button" class="active" id="imageButton">图片</button>
+            <button type="button" id="productDetailButton">设计</button>
+            <button type="button" id="videoButton">视频</button>
+            <button type="button" id="backButton">画布</button>
           </div>
           <p>上传、粘贴或拖入一张底图，选择 API 后生成。结果会直接显示在右侧，也会保存到本机任务目录。</p>
         </section>
@@ -683,6 +701,7 @@
     </main>
 
     <script>
+      const apiBase = location.protocol === "file:" ? "http://127.0.0.1:43219" : "";
       const providers = [
         { id: "wanxiang", name: "阿里万象" },
         { id: "volcengine", name: "火山" },
@@ -911,7 +930,7 @@
       }
 
       async function loadConfig() {
-        const response = await fetch("/api/image-config", { cache: "no-store" });
+        const response = await fetch(`${apiBase}/api/image-config`, { cache: "no-store" });
         const data = await response.json();
         if (!response.ok || data.error) throw new Error(data.error || "读取 API 设置失败");
         configProviders = data.providers || [];
@@ -957,7 +976,7 @@
         if (!provider) return;
         const values = Object.fromEntries(provider.fields.map((field) => [field.key, configValues[field.key] || ""]));
         setMessage("正在保存 API 设置...");
-        const response = await fetch("/api/image-config", {
+        const response = await fetch(`${apiBase}/api/image-config`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ provider: currentProvider, values }),
@@ -1090,7 +1109,7 @@
           .join("\n");
         const providerName = providers.find((item) => item.id === currentProvider)?.name || currentProvider;
         setMessage(`正在提交到 ${providerName}...`);
-        const response = await fetch("/api/image-generation", {
+        const response = await fetch(`${apiBase}/api/image-generation`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1120,7 +1139,7 @@
           showResult({
             name: data.resultImagePath.split("/").slice(-2).join("/"),
             path: data.resultImagePath,
-            url: data.resultImageUrl,
+            url: resolveUrl(data.resultImageUrl),
           });
           setMessage(`生成成功：${data.resultImagePath}`);
           await loadHistory();
@@ -1166,7 +1185,7 @@
       async function deleteGeneratedImage(image) {
         const ok = window.confirm(`确定删除这张生成图片吗？\n\n${image.name}\n${image.path}`);
         if (!ok) return;
-        const response = await fetch("/api/generated-image-delete", {
+        const response = await fetch(`${apiBase}/api/generated-image-delete`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ path: image.path }),
@@ -1182,7 +1201,7 @@
       }
 
       async function loadHistory() {
-        const response = await fetch("/api/recent-images", { cache: "no-store" });
+        const response = await fetch(`${apiBase}/api/recent-images`, { cache: "no-store" });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "读取历史结果失败");
         const images = (data.images || []).filter((image) => /result|output|wanxiang|kling|volcengine|fal|openai|my|flux|sd/i.test(`${image.name} ${image.path}`));
@@ -1194,7 +1213,7 @@
           button.role = "button";
           button.className = `thumb ${selectedHistoryPath === image.path ? "selected" : ""}`;
           button.title = image.path;
-          button.innerHTML = `<img src="${image.url}" alt=""><span>${escapeHtml(image.name)}</span>`;
+          button.innerHTML = `<img src="${resolveUrl(image.url)}" alt=""><span>${escapeHtml(image.name)}</span>`;
           button.addEventListener("click", () => showResult(image));
           button.addEventListener("keydown", (event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -1227,11 +1246,19 @@
         return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
       }
 
+      function resolveUrl(url) {
+        if (!url || /^https?:|^data:|^blob:/i.test(url)) return url;
+        return `${apiBase}${url}`;
+      }
+
       document.querySelector("#backButton").addEventListener("click", () => {
-        window.location.href = "/?installed=1";
+        window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1` : "/?installed=1";
       });
       document.querySelector("#productDetailButton").addEventListener("click", () => {
         window.location.href = location.protocol === "file:" ? "http://127.0.0.1:43219/product-detail-generator.html" : "/product-detail-generator.html";
+      });
+      document.querySelector("#videoButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1&video=1` : "/?installed=1&video=1";
       });
       document.querySelector("#settingsButton").addEventListener("click", () => settingsPanel.classList.toggle("visible"));
       providerSelect.addEventListener("change", () => {

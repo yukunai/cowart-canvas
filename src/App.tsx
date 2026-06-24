@@ -49,6 +49,12 @@ function readInitialLanguage(): Language {
   return window.localStorage.getItem('cowart-canvas-language') === 'en' ? 'en' : 'zh'
 }
 
+function readInitialVideoPanelOpen() {
+  if (typeof window === 'undefined') return false
+  const params = new URLSearchParams(window.location.search)
+  return params.get('video') === '1' || params.get('panel') === 'video'
+}
+
 function getDefaultStatus(language: Language) {
   return language === 'en'
     ? 'Upload, paste, or drop any image, then mark the problem area.'
@@ -764,7 +770,7 @@ function App() {
   const [downloadImages, setDownloadImages] = useState<RecentImage[]>([])
   const [isDownloadsOpen, setIsDownloadsOpen] = useState(false)
   const [isDownloadsLoading, setIsDownloadsLoading] = useState(false)
-  const [isVideoPanelOpen, setIsVideoPanelOpen] = useState(false)
+  const [isVideoPanelOpen, setIsVideoPanelOpen] = useState(() => readInitialVideoPanelOpen())
   const [videoProvider, setVideoProvider] = useState<VideoProvider>('kling')
   const [videoPrompt, setVideoPrompt] = useState('')
   const [videoNegativePrompt, setVideoNegativePrompt] = useState('')
@@ -2154,6 +2160,14 @@ function App() {
     const timer = window.setInterval(() => setNowTick(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [isVideoPanelOpen])
+
+  useEffect(() => {
+    if (!isVideoPanelOpen || videoTasks.length > 0 || isVideoTasksLoading) return
+    const timer = window.setTimeout(() => {
+      void loadVideoTasks()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [isVideoPanelOpen, isVideoTasksLoading, loadVideoTasks, videoTasks.length])
 
   useEffect(() => {
     if (!isVideoPanelOpen || !activeVideoTask?.id || !activeVideoTaskIsGenerating) return undefined

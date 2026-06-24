@@ -94,6 +94,22 @@
         justify-content: space-between;
       }
 
+      .mode-nav {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .mode-nav button {
+        padding: 0 10px;
+      }
+
+      .mode-nav button.active {
+        border-color: #1f6feb;
+        background: #eff6ff;
+        color: #185abc;
+      }
+
       h1,
       h2,
       p {
@@ -390,9 +406,14 @@
     <main class="app">
       <aside class="sidebar">
         <section class="header">
-          <div class="title-row">
+          <div>
             <h1>商品详情页生成</h1>
-            <button type="button" id="imagePageButton">通用生图</button>
+          </div>
+          <div class="mode-nav">
+            <button type="button" id="imagePageButton">图片</button>
+            <button type="button" class="active" id="designButton">设计</button>
+            <button type="button" id="videoButton">视频</button>
+            <button type="button" id="canvasButton">画布</button>
           </div>
           <p>专门给电商商品图生成详情页长图：上传主产品图和参考图，填写卖点、风格和模块结构。</p>
         </section>
@@ -737,6 +758,11 @@
           .join("\n");
       }
 
+      function getProductDetailTaskTitle() {
+        const productName = productNameInput.value.trim() || "product";
+        return `product-detail-${productName}-${currentImage?.title || "source"}`;
+      }
+
       async function generateProductDetail() {
         if (!currentImage) {
           setMessage("先上传、粘贴或拖入一张主产品图。");
@@ -751,7 +777,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             provider: currentProvider,
-            image: { title: currentImage.title, source: currentImage.source },
+            image: { title: getProductDetailTaskTitle(), source: currentImage.source },
             references: referenceImages.map((reference, index) => ({
               label: `详情页参考图 ${index + 1}`,
               image: { title: reference.title, source: "uploaded" },
@@ -800,9 +826,13 @@
         const response = await fetch(`${apiBase}/api/recent-images`, { cache: "no-store" });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "读取历史结果失败");
-        const images = (data.images || []).filter((image) => /result|output|wanxiang|kling|volcengine|fal|openai|my|flux|sd/i.test(`${image.name} ${image.path}`));
+        const images = (data.images || []).filter((image) => /product-detail/i.test(`${image.name} ${image.path}`));
         historyCount.textContent = `${images.length} 张`;
         historyGrid.innerHTML = "";
+        if (images.length === 0) {
+          historyGrid.innerHTML = "<p class='hint'>这里之后只显示设计页生成的详情图，不混入普通图片结果。</p>";
+          return;
+        }
         for (const image of images.slice(0, 30)) {
           const card = document.createElement("button");
           card.type = "button";
@@ -837,6 +867,12 @@
       document.querySelector("#refreshHistoryButton").addEventListener("click", () => loadHistory().catch((error) => setMessage(error.message)));
       document.querySelector("#imagePageButton").addEventListener("click", () => {
         window.location.href = location.protocol === "file:" ? `${apiBase}/image-generator.html` : "/image-generator.html";
+      });
+      document.querySelector("#videoButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1&video=1` : "/?installed=1&video=1";
+      });
+      document.querySelector("#canvasButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1` : "/?installed=1";
       });
 
       const dropZone = document.querySelector("#dropZone");
