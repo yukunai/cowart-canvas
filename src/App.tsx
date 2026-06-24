@@ -2227,45 +2227,47 @@ function App() {
     >
       <aside className="codex-panel">
         <header className="panel-header">
-          <button
-            type="button"
-            className="mode-entry-button"
-            onClick={() => {
-              window.location.href = '/image-generator.html'
-            }}
-          >
-            {tr('图片', 'Image')}
-          </button>
-          <button
-            type="button"
-            className="video-entry-button"
-            onClick={() => {
-              window.location.href = '/product-detail-generator.html'
-            }}
-          >
-            {tr('设计', 'Design')}
-          </button>
-          <button
-            type="button"
-            className={`video-entry-button ${isVideoPanelOpen ? 'active' : ''}`}
-            onClick={() => {
-              setIsVideoPanelOpen(true)
-              void loadVideoTasks()
-              if (!activeImage) setStatus(tr('可以先从最近生成里点一张，作为视频首帧', 'Pick a recent generated image first to use as the first frame.'))
-            }}
-          >
-            {tr('视频', 'Video')}
-          </button>
-          <button
-            type="button"
-            className={`mode-entry-button ${!isVideoPanelOpen ? 'active' : ''}`}
-            onClick={() => {
-              setIsVideoPanelOpen(false)
-              setStatus(activeImage ? tr('已进入改图画布，可以继续标注要修改的位置', 'Image canvas is active. Keep marking the areas to edit.') : getDefaultStatus(language))
-            }}
-          >
-            {tr('画布', 'Canvas')}
-          </button>
+          <div className="mode-nav">
+            <button
+              type="button"
+              className="mode-entry-button"
+              onClick={() => {
+                window.location.href = '/image-generator.html'
+              }}
+            >
+              {tr('图片', 'Image')}
+            </button>
+            <button
+              type="button"
+              className="video-entry-button"
+              onClick={() => {
+                window.location.href = '/product-detail-generator.html'
+              }}
+            >
+              {tr('设计', 'Design')}
+            </button>
+            <button
+              type="button"
+              className={`video-entry-button ${isVideoPanelOpen ? 'active' : ''}`}
+              onClick={() => {
+                setIsVideoPanelOpen(true)
+                void loadVideoTasks()
+                if (!activeImage) setStatus(tr('可以先从最近生成里点一张，作为视频首帧', 'Pick a recent generated image first to use as the first frame.'))
+              }}
+            >
+              {tr('视频', 'Video')}
+            </button>
+            <button
+              type="button"
+              className={`mode-entry-button ${!isVideoPanelOpen ? 'active' : ''}`}
+              onClick={() => {
+                setIsVideoPanelOpen(false)
+                setStatus(activeImage ? tr('已进入改图画布，可以继续标注要修改的位置', 'Image canvas is active. Keep marking the areas to edit.') : getDefaultStatus(language))
+              }}
+            >
+              {tr('画布', 'Canvas')}
+            </button>
+          </div>
           <label className="language-select">
             <Globe2 size={14} />
             <select aria-label={tr('语言', 'Language')} value={language} onChange={(event) => setLanguage(event.target.value as Language)}>
