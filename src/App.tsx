@@ -2229,13 +2229,23 @@ function App() {
         <header className="panel-header">
           <button
             type="button"
-            className={`mode-entry-button ${!isVideoPanelOpen ? 'active' : ''}`}
+            className="mode-entry-button"
             onClick={() => {
-              setIsVideoPanelOpen(false)
-              setStatus(activeImage ? tr('已进入改图画布，可以继续标注要修改的位置', 'Image canvas is active. Keep marking the areas to edit.') : getDefaultStatus(language))
+              window.location.href = '/image-generator.html'
             }}
           >
-            {tr('改图画布', 'Edit Canvas')}
+            <ImagePlus size={15} />
+            {tr('图片', 'Image')}
+          </button>
+          <button
+            type="button"
+            className="video-entry-button"
+            onClick={() => {
+              window.location.href = '/product-detail-generator.html'
+            }}
+          >
+            <ImagePlus size={15} />
+            {tr('设计', 'Design')}
           </button>
           <button
             type="button"
@@ -2247,11 +2257,17 @@ function App() {
             }}
           >
             <Video size={15} />
-            {tr('生成视频', 'Video')}
+            {tr('视频', 'Video')}
           </button>
-          <button type="button" className="video-entry-button" onClick={() => { window.location.href = '/image-generator.html' }}>
-            <ImagePlus size={15} />
-            {tr('生成图片', 'Image')}
+          <button
+            type="button"
+            className={`mode-entry-button ${!isVideoPanelOpen ? 'active' : ''}`}
+            onClick={() => {
+              setIsVideoPanelOpen(false)
+              setStatus(activeImage ? tr('已进入改图画布，可以继续标注要修改的位置', 'Image canvas is active. Keep marking the areas to edit.') : getDefaultStatus(language))
+            }}
+          >
+            {tr('画布', 'Canvas')}
           </button>
           <label className="language-select">
             <Globe2 size={14} />

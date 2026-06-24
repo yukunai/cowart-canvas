@@ -138,8 +138,8 @@ textarea {
 }
 
 .mode-entry-button {
-  flex: 0 0 104px;
-  width: 104px;
+  flex: 0 0 72px;
+  width: 72px;
   min-height: 34px;
   padding: 0 10px;
   font-size: 13px;
@@ -155,8 +155,8 @@ textarea {
 }
 
 .video-entry-button {
-  flex: 0 0 104px;
-  width: 104px;
+  flex: 0 0 72px;
+  width: 72px;
   min-height: 34px;
   padding: 0 10px;
   color: #1f5fbf;

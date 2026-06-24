@@ -90,6 +90,10 @@
         gap: 10px;
       }
 
+      .provider-row {
+        align-items: end;
+      }
+
       .title-row {
         justify-content: space-between;
       }
@@ -174,6 +178,29 @@
       .field-grid {
         display: grid;
         gap: 10px;
+      }
+
+      .two-column-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .skill-description,
+      .skill-meta {
+        border: 1px solid #dce3eb;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: #607083;
+        font-size: 12px;
+        line-height: 1.5;
+        padding: 9px 10px;
+      }
+
+      .skill-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
       }
 
       .button-row button {
@@ -436,24 +463,38 @@
             <button type="button" class="primary" id="saveConfigButton">保存 API 设置</button>
           </div>
           <label>
-            详情页类型
-            <select id="templateSelect">
-              <option value="premium">高级品牌详情页</option>
-              <option value="commerce">电商转化详情页</option>
-              <option value="minimal">极简质感详情页</option>
-              <option value="tech">科技参数详情页</option>
-              <option value="beauty">美妆护肤详情页</option>
-            </select>
+            Skill / 设计策略
+            <select id="designSkillSelect"></select>
           </label>
-          <label>
-            生成比例
-            <select id="aspectRatioSelect">
-              <option value="9:16">详情长图 9:16</option>
-              <option value="3:4">竖版 3:4</option>
-              <option value="2:3">竖版 2:3</option>
-              <option value="1:1">方图 1:1</option>
-            </select>
-          </label>
+          <p class="skill-description" id="designSkillDescription"></p>
+          <div class="skill-actions">
+            <button type="button" id="skillUploadButton">上传 Skill</button>
+            <button type="button" id="skillInstallButton">安装当前</button>
+            <button type="button" id="skillDownloadButton">下载当前</button>
+          </div>
+          <input id="skillInput" type="file" accept="application/json,.json" hidden />
+          <p class="skill-meta" id="skillMeta">Skill 文件是 JSON，可上传后安装到本机列表。</p>
+          <div class="two-column-row">
+            <label>
+              详情页类型
+              <select id="templateSelect">
+                <option value="premium">高级品牌详情页</option>
+                <option value="commerce">电商转化详情页</option>
+                <option value="minimal">极简质感详情页</option>
+                <option value="tech">科技参数详情页</option>
+                <option value="beauty">美妆护肤详情页</option>
+              </select>
+            </label>
+            <label>
+              生成比例
+              <select id="aspectRatioSelect">
+                <option value="9:16">详情长图 9:16</option>
+                <option value="3:4">竖版 3:4</option>
+                <option value="2:3">竖版 2:3</option>
+                <option value="1:1">方图 1:1</option>
+              </select>
+            </label>
+          </div>
         </section>
 
         <section class="section">
@@ -553,12 +594,46 @@
         beauty:
           "美妆护肤详情页。适合护肤、美妆、香氛，强调质地、成分、使用感、自然光、柔和高级色彩和干净排版。",
       };
+      const defaultDesignSkills = [
+        {
+          id: "detail-page-layout",
+          name: "详情页长图",
+          description: "适合生成完整商品详情页，强调模块清晰、视觉统一、可直接展示。",
+          prompt:
+            "生成完整商品详情页长图。必须有清晰分区、首屏主视觉、核心卖点、细节展示、场景/包装/参数模块；整体像成熟电商详情页，而不是单张海报。",
+        },
+        {
+          id: "luxury-brand",
+          name: "高级品牌感",
+          description: "适合轻奢、服饰、美妆、生活方式类商品。",
+          prompt:
+            "高级品牌视觉策略。强调留白、精致排版、真实材质、柔和光线、克制配色和高端摄影质感；信息要少而准，不要廉价促销风。",
+        },
+        {
+          id: "conversion-commerce",
+          name: "电商转化",
+          description: "适合需要清楚讲卖点、场景、细节和购买理由的商品。",
+          prompt:
+            "电商转化策略。突出商品价值、核心卖点、使用场景、细节特写和信任感；版式要清楚，信息层级明确，适合用户快速扫读。",
+        },
+        {
+          id: "product-comparison",
+          name: "卖点对比",
+          description: "适合需要突出升级、参数、功能差异的商品。",
+          prompt:
+            "卖点对比策略。用清晰模块表达商品优势、参数、细节和使用前后/竞品对比，但不要生成密集小字或错误数据。",
+        },
+      ];
+      const customSkillStorageKey = "cowart-product-detail-skills";
 
       let currentProvider = localStorage.getItem("cowart-product-detail-provider") || "fal";
+      let currentDesignSkill = localStorage.getItem("cowart-product-detail-skill") || "detail-page-layout";
       let currentImage = null;
       let referenceImages = [];
       let configProviders = [];
       let configValues = {};
+      let customDesignSkills = loadCustomDesignSkills();
+      let designSkills = mergeDesignSkills();
 
       const providerSelect = document.querySelector("#providerSelect");
       const settingsPanel = document.querySelector("#settingsPanel");
@@ -571,6 +646,10 @@
       const negativePromptInput = document.querySelector("#negativePromptInput");
       const templateSelect = document.querySelector("#templateSelect");
       const aspectRatioSelect = document.querySelector("#aspectRatioSelect");
+      const designSkillSelect = document.querySelector("#designSkillSelect");
+      const designSkillDescription = document.querySelector("#designSkillDescription");
+      const skillInput = document.querySelector("#skillInput");
+      const skillMeta = document.querySelector("#skillMeta");
       const message = document.querySelector("#message");
       const sourcePreview = document.querySelector("#sourcePreview");
       const sourceImage = document.querySelector("#sourceImage");
@@ -609,6 +688,108 @@
           providerSelect.appendChild(option);
         }
         providerSelect.value = currentProvider;
+      }
+
+      function normalizeDesignSkill(value, fallbackIndex = 0) {
+        if (!value || typeof value !== "object") return null;
+        const name = String(value.name || value.label || `自定义设计 Skill ${fallbackIndex + 1}`).trim();
+        const prompt = String(value.prompt || value.instructions || value.content || "").trim();
+        if (!name || !prompt) return null;
+        return {
+          id: String(value.id || name.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, "-") || `custom-${fallbackIndex}`).slice(0, 80),
+          name,
+          description: String(value.description || value.summary || "用户安装的自定义详情页设计 Skill。").trim(),
+          prompt,
+          installedAt: value.installedAt || new Date().toISOString(),
+        };
+      }
+
+      function loadCustomDesignSkills() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(customSkillStorageKey) || "[]");
+          return Array.isArray(parsed) ? parsed.map((item, index) => normalizeDesignSkill(item, index)).filter(Boolean) : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function saveCustomDesignSkills() {
+        localStorage.setItem(customSkillStorageKey, JSON.stringify(customDesignSkills, null, 2));
+      }
+
+      function mergeDesignSkills() {
+        const byId = new Map();
+        for (const skill of defaultDesignSkills) byId.set(skill.id, skill);
+        for (const skill of customDesignSkills) byId.set(skill.id, skill);
+        return Array.from(byId.values());
+      }
+
+      function getSelectedDesignSkill() {
+        return designSkills.find((skill) => skill.id === currentDesignSkill) || designSkills[0];
+      }
+
+      function renderDesignSkills() {
+        if (!designSkills.some((skill) => skill.id === currentDesignSkill)) currentDesignSkill = designSkills[0]?.id || "";
+        designSkillSelect.innerHTML = "";
+        for (const skill of designSkills) {
+          const option = document.createElement("option");
+          option.value = skill.id;
+          option.textContent = skill.name;
+          designSkillSelect.appendChild(option);
+        }
+        designSkillSelect.value = currentDesignSkill;
+        updateDesignSkillDescription();
+      }
+
+      function updateDesignSkillDescription() {
+        const skill = getSelectedDesignSkill();
+        designSkillDescription.textContent = skill?.description || "";
+        skillMeta.textContent = skill
+          ? `当前 Skill：${skill.name}。内置 ${defaultDesignSkills.length} 个，自定义 ${customDesignSkills.length} 个。`
+          : "Skill 文件是 JSON，可上传后安装到本机列表。";
+      }
+
+      function installDesignSkills(nextSkills) {
+        const normalized = nextSkills.map((item, index) => normalizeDesignSkill(item, index)).filter(Boolean);
+        if (normalized.length === 0) {
+          setMessage("没有识别到可安装的 Skill。JSON 里至少要有 name 和 prompt。");
+          return;
+        }
+        const byId = new Map(customDesignSkills.map((skill) => [skill.id, skill]));
+        for (const skill of normalized) byId.set(skill.id, skill);
+        customDesignSkills = Array.from(byId.values());
+        designSkills = mergeDesignSkills();
+        saveCustomDesignSkills();
+        currentDesignSkill = normalized[0].id;
+        localStorage.setItem("cowart-product-detail-skill", currentDesignSkill);
+        renderDesignSkills();
+        setMessage(`已安装 ${normalized.length} 个设计 Skill。`);
+      }
+
+      async function uploadSkillFile(file) {
+        if (!file) return;
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        installDesignSkills(Array.isArray(parsed) ? parsed : [parsed]);
+      }
+
+      function downloadCurrentSkill() {
+        const skill = getSelectedDesignSkill();
+        if (!skill) return;
+        const blob = new Blob([JSON.stringify(skill, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${skill.id || "product-detail-skill"}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        setMessage("已下载当前设计 Skill。");
+      }
+
+      function installCurrentSkill() {
+        const skill = getSelectedDesignSkill();
+        if (!skill) return;
+        installDesignSkills([{ ...skill, id: `${skill.id}-copy-${Date.now()}`, name: `${skill.name} 副本`, installedAt: undefined }]);
       }
 
       async function loadConfig() {
@@ -742,7 +923,10 @@
         const sellingPoints = sellingPointsInput.value.trim() || "突出商品质感、核心卖点、细节和使用场景";
         const modules = modulesInput.value.trim() || "首屏主视觉、核心卖点、材质细节、使用场景、尺寸/参数、购买理由";
         const template = templatePrompts[templateSelect.value] || templatePrompts.premium;
+        const skill = getSelectedDesignSkill();
         return [
+          skill ? `Skill：${skill.name}` : "",
+          skill?.prompt || "",
           "请生成一张专门用于电商/品牌展示的商品详情页图片，不是普通单张商品海报。",
           template,
           `商品名称：${productName}`,
@@ -852,6 +1036,18 @@
       document.querySelector("#settingsButton").addEventListener("click", () => settingsPanel.classList.toggle("open"));
       document.querySelector("#refreshConfigButton").addEventListener("click", () => loadConfig().catch((error) => setMessage(error.message)));
       document.querySelector("#saveConfigButton").addEventListener("click", () => saveConfig().catch((error) => setMessage(error.message)));
+      document.querySelector("#skillUploadButton").addEventListener("click", () => skillInput.click());
+      document.querySelector("#skillInstallButton").addEventListener("click", installCurrentSkill);
+      document.querySelector("#skillDownloadButton").addEventListener("click", downloadCurrentSkill);
+      skillInput.addEventListener("change", () => {
+        uploadSkillFile(skillInput.files?.[0]).catch((error) => setMessage(error.message));
+        skillInput.value = "";
+      });
+      designSkillSelect.addEventListener("change", () => {
+        currentDesignSkill = designSkillSelect.value;
+        localStorage.setItem("cowart-product-detail-skill", currentDesignSkill);
+        updateDesignSkillDescription();
+      });
       document.querySelector("#uploadButton").addEventListener("click", () => document.querySelector("#fileInput").click());
       document.querySelector("#referenceUploadButton").addEventListener("click", () => document.querySelector("#referenceInput").click());
       document.querySelector("#fileInput").addEventListener("change", (event) => setSourceFile(event.target.files?.[0]).catch((error) => setMessage(error.message)));
@@ -890,6 +1086,7 @@
       });
 
       renderProviders();
+      renderDesignSkills();
       renderReferences();
       loadConfig().catch((error) => setMessage(error.message));
       loadHistory().catch((error) => setMessage(error.message));
