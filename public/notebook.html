@@ -22,12 +22,14 @@
 
       button,
       input,
+      select,
       textarea {
         font: inherit;
       }
 
       button,
       input,
+      select,
       textarea {
         border: 1px solid #cfd9e6;
         border-radius: 8px;
@@ -139,6 +141,27 @@
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       }
 
+      .search-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+      }
+
+      .search-row input {
+        min-height: 32px;
+        font-size: 12px;
+        padding: 0 10px;
+      }
+
+      .subtle-action {
+        min-height: 32px;
+        border-radius: 7px;
+        color: #45566a;
+        font-size: 12px;
+        font-weight: 650;
+        padding: 0 10px;
+      }
+
       .category-actions button {
         min-height: 26px;
         border-radius: 6px;
@@ -216,6 +239,27 @@
       .note-tree-item span {
         color: #8090a3;
         font-size: 10px;
+      }
+
+      .note-meta-line {
+        grid-column: 1 / -1;
+        overflow: hidden;
+        color: #748398;
+        font-size: 10px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .note-badge {
+        display: inline-flex;
+        align-items: center;
+        height: 16px;
+        border-radius: 999px;
+        background: #edf4ff;
+        color: #185abc;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 0 6px;
       }
 
       .inline-rename {
@@ -321,7 +365,7 @@
 
       .topbar {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+        grid-template-columns: minmax(0, 1fr) 150px 116px auto auto auto auto auto;
         gap: 10px;
         border-bottom: 1px solid #dce3eb;
         background: #ffffff;
@@ -333,6 +377,17 @@
         font-size: 12px;
         font-weight: 680;
         padding: 0 10px;
+      }
+
+      .code-language-select,
+      .tag-input {
+        min-height: 34px;
+        font-size: 12px;
+        padding: 0 10px;
+      }
+
+      .tag-input {
+        min-width: 0;
       }
 
       .title-input {
@@ -399,9 +454,43 @@
       .preview p,
       .preview ul,
       .preview ol,
+      .toc,
       .code-block,
       .preview blockquote {
         margin: 0 0 12px;
+      }
+
+      .toc {
+        border: 1px solid #dce7f3;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 10px 12px;
+      }
+
+      .toc strong {
+        display: block;
+        margin-bottom: 6px;
+        color: #344054;
+        font-size: 12px;
+      }
+
+      .toc a {
+        display: block;
+        overflow: hidden;
+        color: #52677e;
+        font-size: 12px;
+        line-height: 1.6;
+        text-decoration: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .toc a.level-2 {
+        padding-left: 12px;
+      }
+
+      .toc a:hover {
+        color: #185abc;
       }
 
       .code-block {
@@ -487,6 +576,15 @@
           grid-template-columns: 1fr;
         }
 
+        .topbar {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .title-input,
+        .tag-input {
+          grid-column: 1 / -1;
+        }
+
         .markdown-editor {
           min-height: 320px;
           border-right: 0;
@@ -513,9 +611,21 @@
             <button type="button" class="primary" id="addCategoryButton">分类</button>
             <button type="button" id="showAddNoteButton">新笔记</button>
           </div>
+          <div class="search-row">
+            <input id="noteSearchInput" placeholder="搜索标题、内容、标签" />
+            <button type="button" class="subtle-action" id="backupNotebookButton">备份</button>
+          </div>
         </section>
         <section class="note-create-card" id="noteCreateCard">
           <select id="noteCategorySelect" aria-label="选择分类"></select>
+          <select id="noteTemplateSelect" aria-label="选择模板">
+            <option value="blank">空白</option>
+            <option value="code">代码记录</option>
+            <option value="prompt">Prompt 记录</option>
+            <option value="plan">项目计划</option>
+            <option value="bug">Bug 记录</option>
+            <option value="meeting">会议纪要</option>
+          </select>
           <input id="newNoteTitleInput" placeholder="笔记标题" />
           <div class="note-create-actions">
             <button type="button" class="primary" id="confirmAddNoteButton">创建</button>
@@ -530,9 +640,20 @@
       <section class="editor">
         <header class="topbar">
           <input class="title-input" id="noteTitleInput" placeholder="笔记标题" />
+          <input class="tag-input" id="noteTagsInput" placeholder="标签，用逗号分隔" />
+          <select class="code-language-select" id="codeLanguageSelect" aria-label="代码语言">
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="python">Python</option>
+            <option value="bash">Bash</option>
+            <option value="json">JSON</option>
+            <option value="markdown">Markdown</option>
+            <option value="text">Text</option>
+          </select>
           <button type="button" class="editor-action" id="headingOneButton">H1</button>
           <button type="button" class="editor-action" id="headingTwoButton">H2</button>
           <button type="button" class="editor-action" id="insertCodeBlockButton">代码块</button>
+          <button type="button" class="editor-action" id="copyMarkdownButton">复制全文</button>
           <button type="button" class="editor-action" id="exportButton">导出 Markdown</button>
         </header>
         <div class="editor-body">
@@ -547,6 +668,8 @@
       <button type="button" class="danger" id="deleteCategoryMenuItem">删除</button>
     </div>
     <div class="context-menu" id="noteMenu" role="menu">
+      <button type="button" id="togglePinNoteMenuItem">置顶</button>
+      <button type="button" id="toggleFavoriteNoteMenuItem">收藏</button>
       <button type="button" class="danger" id="deleteNoteMenuItem">删除笔记</button>
     </div>
 
@@ -562,21 +685,28 @@
       let menuNoteId = "";
       let editingCategoryId = "";
       let hasLocalChanges = false;
+      let searchQuery = "";
 
       const categoryList = document.querySelector("#categoryList");
       const noteTitleInput = document.querySelector("#noteTitleInput");
+      const noteTagsInput = document.querySelector("#noteTagsInput");
       const noteContentInput = document.querySelector("#noteContentInput");
       const preview = document.querySelector("#preview");
       const headingOneButton = document.querySelector("#headingOneButton");
       const headingTwoButton = document.querySelector("#headingTwoButton");
       const insertCodeBlockButton = document.querySelector("#insertCodeBlockButton");
+      const copyMarkdownButton = document.querySelector("#copyMarkdownButton");
       const exportButton = document.querySelector("#exportButton");
+      const codeLanguageSelect = document.querySelector("#codeLanguageSelect");
       const storagePathText = document.querySelector("#storagePathText");
       const categoryMenu = document.querySelector("#categoryMenu");
       const noteMenu = document.querySelector("#noteMenu");
       const noteCreateCard = document.querySelector("#noteCreateCard");
       const noteCategorySelect = document.querySelector("#noteCategorySelect");
+      const noteTemplateSelect = document.querySelector("#noteTemplateSelect");
       const newNoteTitleInput = document.querySelector("#newNoteTitleInput");
+      const noteSearchInput = document.querySelector("#noteSearchInput");
+      const backupNotebookButton = document.querySelector("#backupNotebookButton");
 
       function clamp(value, min, max) {
         return Math.min(max, Math.max(min, value));
@@ -627,6 +757,9 @@
                   id: noteId,
                   title: "第一篇 Markdown",
                   content: "# 第一篇 Markdown\n\n- 可以建分类\n- 可以写多篇内容\n- 右侧会实时预览\n\n> 数据会保存到本机文件夹。",
+                  tags: ["示例"],
+                  pinned: false,
+                  favorite: false,
                   updatedAt: new Date().toISOString(),
                 },
               ],
@@ -678,10 +811,13 @@
             notes: Array.isArray(category.notes)
               ? category.notes.map((note) => ({
                   id: String(note.id || createId("note")),
-                  title: String(note.title || "未命名笔记"),
-                  content: String(note.content || ""),
-                  updatedAt: String(note.updatedAt || new Date().toISOString()),
-                  filePath: note.filePath || "",
+	                  title: String(note.title || "未命名笔记"),
+	                  content: String(note.content || ""),
+	                  tags: Array.isArray(note.tags) ? note.tags.map(String).filter(Boolean) : [],
+	                  pinned: Boolean(note.pinned),
+	                  favorite: Boolean(note.favorite),
+	                  updatedAt: String(note.updatedAt || new Date().toISOString()),
+	                  filePath: note.filePath || "",
                 }))
               : [],
           })),
@@ -746,10 +882,17 @@
       function renderMarkdown(markdown) {
         const lines = String(markdown || "").split(/\r?\n/);
         const html = [];
+        const headings = [];
         let inCode = false;
         let listOpen = false;
         const copyIcon =
           '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8" y="8" width="10" height="10" rx="2" stroke="currentColor" stroke-width="2"/><path d="M6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+        const makeHeadingId = (text) =>
+          `h-${headings.length + 1}-${text
+            .toLowerCase()
+            .replace(/[^\p{L}\p{N}]+/gu, "-")
+            .replace(/^-|-$/g, "")
+            .slice(0, 42) || "heading"}`;
         for (const rawLine of lines) {
           const line = rawLine;
           if (line.trim().startsWith("```")) {
@@ -778,15 +921,30 @@
             listOpen = false;
           }
           if (line.startsWith("### ")) html.push(`<h3>${inlineMarkdown(line.slice(4))}</h3>`);
-          else if (line.startsWith("## ")) html.push(`<h2>${inlineMarkdown(line.slice(3))}</h2>`);
-          else if (line.startsWith("# ")) html.push(`<h1>${inlineMarkdown(line.slice(2))}</h1>`);
+          else if (line.startsWith("## ")) {
+            const text = line.slice(3);
+            const id = makeHeadingId(text);
+            headings.push({ id, level: 2, text });
+            html.push(`<h2 id="${escapeHtml(id)}">${inlineMarkdown(text)}</h2>`);
+          } else if (line.startsWith("# ")) {
+            const text = line.slice(2);
+            const id = makeHeadingId(text);
+            headings.push({ id, level: 1, text });
+            html.push(`<h1 id="${escapeHtml(id)}">${inlineMarkdown(text)}</h1>`);
+          }
           else if (line.startsWith("> ")) html.push(`<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`);
           else if (line.trim() === "") html.push("");
           else html.push(`<p>${inlineMarkdown(line)}</p>`);
         }
         if (listOpen) html.push("</ul>");
         if (inCode) html.push("</code></pre></div>");
-        return html.join("\n");
+        const toc =
+          headings.length > 1
+            ? `<nav class="toc"><strong>目录</strong>${headings
+                .map((heading) => `<a class="level-${heading.level}" href="#${escapeHtml(heading.id)}">${escapeHtml(heading.text)}</a>`)
+                .join("")}</nav>`
+            : "";
+        return `${toc}${html.join("\n")}`;
       }
 
       function inlineMarkdown(value) {
@@ -796,11 +954,48 @@
           .replace(/\*([^*]+)\*/g, "<em>$1</em>");
       }
 
+      function normalizedSearch(value) {
+        return String(value || "").trim().toLowerCase();
+      }
+
+      function noteSearchText(note, category) {
+        return [category?.name, note.title, note.content, ...(note.tags || [])].join(" ").toLowerCase();
+      }
+
+      function noteMatchesSearch(note, category) {
+        const query = normalizedSearch(searchQuery);
+        if (!query) return true;
+        return noteSearchText(note, category).includes(query);
+      }
+
+      function categoryMatchesSearch(category) {
+        const query = normalizedSearch(searchQuery);
+        if (!query) return true;
+        return category.name.toLowerCase().includes(query) || category.notes.some((note) => noteMatchesSearch(note, category));
+      }
+
+      function sortedNotes(notes) {
+        return [...notes].sort((left, right) => {
+          if (Boolean(left.pinned) !== Boolean(right.pinned)) return left.pinned ? -1 : 1;
+          return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+        });
+      }
+
+      function formatNoteMeta(note) {
+        const parts = [];
+        if (note.pinned) parts.push("置顶");
+        if (note.favorite) parts.push("收藏");
+        if (note.tags?.length) parts.push(note.tags.map((tag) => `#${tag}`).join(" "));
+        return parts.join(" · ");
+      }
+
       function renderCategories() {
         categoryList.innerHTML = "";
         for (const category of data.categories) {
+          if (!categoryMatchesSearch(category)) continue;
           const group = document.createElement("div");
           group.className = "category-group";
+          const visibleNotes = sortedNotes(category.notes).filter((note) => noteMatchesSearch(note, category));
 
           if (editingCategoryId === category.id) {
             const input = document.createElement("input");
@@ -823,7 +1018,7 @@
             const button = document.createElement("button");
             button.type = "button";
             button.className = `item category-item ${category.id === activeCategoryId ? "active" : ""}`;
-            button.innerHTML = `<strong>${escapeHtml(category.name)}</strong><span>${category.notes.length} 篇</span>`;
+            button.innerHTML = `<strong>${escapeHtml(category.name)}</strong><span>${visibleNotes.length}/${category.notes.length} 篇</span>`;
             button.addEventListener("click", () => {
               activeCategoryId = category.id;
               activeNoteId = category.notes[0]?.id;
@@ -845,14 +1040,15 @@
           if (category.id === activeCategoryId) {
             const noteListElement = document.createElement("div");
             noteListElement.className = "category-note-list";
-            if (category.notes.length === 0) {
-              noteListElement.innerHTML = "<div class='empty'>这个分类里还没有笔记。</div>";
+            if (visibleNotes.length === 0) {
+              noteListElement.innerHTML = searchQuery ? "<div class='empty'>没有匹配的笔记。</div>" : "<div class='empty'>这个分类里还没有笔记。</div>";
             }
-            for (const note of category.notes) {
+            for (const note of visibleNotes) {
               const noteButton = document.createElement("button");
               noteButton.type = "button";
               noteButton.className = `note-tree-item ${note.id === activeNoteId ? "active" : ""}`;
-              noteButton.innerHTML = `<strong>${escapeHtml(note.title || "未命名笔记")}</strong><span>${new Date(note.updatedAt).toLocaleDateString()}</span>`;
+              const meta = formatNoteMeta(note);
+              noteButton.innerHTML = `<strong>${note.favorite ? "★ " : ""}${escapeHtml(note.title || "未命名笔记")}</strong><span>${new Date(note.updatedAt).toLocaleDateString()}</span>${meta ? `<div class="note-meta-line">${escapeHtml(meta)}</div>` : ""}`;
               noteButton.addEventListener("click", () => {
                 activeCategoryId = category.id;
                 activeNoteId = note.id;
@@ -863,11 +1059,12 @@
                 event.preventDefault();
                 activeCategoryId = category.id;
                 activeNoteId = note.id;
-                menuNoteId = note.id;
-                saveNotebook();
-                renderAll();
-                showContextMenu(noteMenu, event.clientX, event.clientY);
-              });
+	                menuNoteId = note.id;
+	                saveNotebook();
+	                renderAll();
+	                updateNoteMenuLabels(note);
+	                showContextMenu(noteMenu, event.clientX, event.clientY);
+	              });
               noteListElement.appendChild(noteButton);
             }
             group.appendChild(noteListElement);
@@ -881,18 +1078,23 @@
         const note = activeNote();
         const disabled = !note;
         noteTitleInput.disabled = disabled;
+        noteTagsInput.disabled = disabled;
         noteContentInput.disabled = disabled;
+        codeLanguageSelect.disabled = disabled;
         headingOneButton.disabled = disabled;
         headingTwoButton.disabled = disabled;
         insertCodeBlockButton.disabled = disabled;
+        copyMarkdownButton.disabled = disabled;
         exportButton.disabled = disabled;
         if (!note) {
           noteTitleInput.value = "";
+          noteTagsInput.value = "";
           noteContentInput.value = "";
           preview.innerHTML = "<div class='empty'>选择或新建一篇笔记。</div>";
           return;
         }
         noteTitleInput.value = note.title;
+        noteTagsInput.value = (note.tags || []).join(", ");
         noteContentInput.value = note.content;
         preview.innerHTML = renderMarkdown(note.content);
       }
@@ -903,6 +1105,7 @@
         renderEditor();
         storagePathText.textContent = storagePath ? `保存位置：${storagePath}` : "本地文件服务未连接，暂存在浏览器。";
         exportButton.textContent = storagePath ? "导出 Markdown" : "导出 Markdown";
+        backupNotebookButton.textContent = "备份";
       }
 
       function addCategory() {
@@ -989,6 +1192,11 @@
         return noteById(menuNoteId) || activeNote();
       }
 
+      function updateNoteMenuLabels(note = menuNote()) {
+        document.querySelector("#togglePinNoteMenuItem").textContent = note?.pinned ? "取消置顶" : "置顶";
+        document.querySelector("#toggleFavoriteNoteMenuItem").textContent = note?.favorite ? "取消收藏" : "收藏";
+      }
+
       function showAddNoteForm() {
         renderCategoryOptions();
         noteCreateCard.classList.add("open");
@@ -1002,13 +1210,29 @@
         noteCreateCard.classList.remove("open");
       }
 
-      function addNote(categoryId = activeCategoryId, title = "新笔记") {
+      function templateContent(template, title) {
+        const safeTitle = title.trim() || "新笔记";
+        const templates = {
+          blank: `# ${safeTitle}\n\n`,
+          code: `# ${safeTitle}\n\n## 目标\n\n## 代码\n\n\`\`\`javascript\n// code\n\`\`\`\n\n## 备注\n\n`,
+          prompt: `# ${safeTitle}\n\n## 正向提示词\n\n## 反向提示词\n\n## 参数\n\n## 结果记录\n\n`,
+          plan: `# ${safeTitle}\n\n## 目标\n\n## 步骤\n\n- \n\n## 验证\n\n`,
+          bug: `# ${safeTitle}\n\n## 现象\n\n## 复现步骤\n\n## 原因\n\n## 修复\n\n`,
+          meeting: `# ${safeTitle}\n\n## 结论\n\n## 待办\n\n- \n\n## 记录\n\n`,
+        };
+        return templates[template] || templates.blank;
+      }
+
+      function addNote(categoryId = activeCategoryId, title = "新笔记", template = "blank") {
         const category = categoryById(categoryId) || activeCategory();
         if (!category) return;
         const note = {
           id: createId("note"),
           title: title.trim() || "新笔记",
-          content: "# 新笔记\n\n",
+          content: templateContent(template, title || "新笔记"),
+          tags: [],
+          pinned: false,
+          favorite: false,
           updatedAt: new Date().toISOString(),
         };
         category.notes.unshift(note);
@@ -1019,7 +1243,7 @@
       }
 
       function confirmAddNote() {
-        addNote(noteCategorySelect.value, newNoteTitleInput.value || "新笔记");
+        addNote(noteCategorySelect.value, newNoteTitleInput.value || "新笔记", noteTemplateSelect.value);
         hideAddNoteForm();
       }
 
@@ -1035,11 +1259,38 @@
         renderAll();
       }
 
+      function togglePinNote(note = activeNote()) {
+        if (!note) return;
+        hideMenus();
+        note.pinned = !note.pinned;
+        note.updatedAt = new Date().toISOString();
+        saveNotebook();
+        renderAll();
+      }
+
+      function toggleFavoriteNote(note = activeNote()) {
+        if (!note) return;
+        hideMenus();
+        note.favorite = !note.favorite;
+        note.updatedAt = new Date().toISOString();
+        saveNotebook();
+        renderAll();
+      }
+
+      function parseTags(value) {
+        return String(value || "")
+          .split(/[,，]/)
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .slice(0, 12);
+      }
+
       function updateActiveNote() {
         const note = activeNote();
         if (!note) return;
         note.title = noteTitleInput.value;
         note.content = noteContentInput.value;
+        note.tags = parseTags(noteTagsInput.value);
         note.updatedAt = new Date().toISOString();
         preview.innerHTML = renderMarkdown(note.content);
         saveNotebook();
@@ -1057,9 +1308,10 @@
         const prefix = before && !before.endsWith("\n") ? "\n\n" : "";
         const suffix = after && !after.startsWith("\n") ? "\n\n" : "";
         const code = selected || "// code";
-        const block = `${prefix}\`\`\`javascript\n${code}\n\`\`\`${suffix}`;
+        const language = codeLanguageSelect.value || "text";
+        const block = `${prefix}\`\`\`${language}\n${code}\n\`\`\`${suffix}`;
         noteContentInput.value = `${before}${block}${after}`;
-        const cursor = selected ? start + block.length : start + prefix.length + "```javascript\n".length;
+        const cursor = selected ? start + block.length : start + prefix.length + `\`\`\`${language}\n`.length;
         noteContentInput.focus();
         noteContentInput.setSelectionRange(cursor, selected ? cursor : cursor + code.length);
         updateActiveNote();
@@ -1111,6 +1363,51 @@
         }, 1200);
       }
 
+      async function copyMarkdown() {
+        const note = activeNote();
+        if (!note) return;
+        const originalText = copyMarkdownButton.textContent;
+        try {
+          await navigator.clipboard.writeText(note.content || "");
+        } catch {
+          const textarea = document.createElement("textarea");
+          textarea.value = note.content || "";
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          textarea.remove();
+        }
+        copyMarkdownButton.textContent = "已复制";
+        window.setTimeout(() => {
+          copyMarkdownButton.textContent = originalText;
+        }, 1200);
+      }
+
+      async function backupNotebook() {
+        const originalText = backupNotebookButton.textContent;
+        backupNotebookButton.disabled = true;
+        backupNotebookButton.textContent = "备份中";
+        try {
+          await saveNotebookToDisk();
+          const response = await fetch(`${apiBase}/api/notebook-backup`, { method: "POST" });
+          const result = await response.json();
+          if (!response.ok || result.error) throw new Error(result.error || "备份失败");
+          backupNotebookButton.textContent = "已备份";
+          storagePathText.textContent = `备份位置：${result.backupPath}`;
+        } catch (error) {
+          backupNotebookButton.textContent = "备份失败";
+          storagePathText.textContent = error instanceof Error ? error.message : "备份失败";
+        } finally {
+          window.setTimeout(() => {
+            backupNotebookButton.disabled = false;
+            backupNotebookButton.textContent = originalText;
+            renderAll();
+          }, 1800);
+        }
+      }
+
       function exportMarkdown() {
         const note = activeNote();
         if (!note) return;
@@ -1141,16 +1438,25 @@
       document.querySelector("#showAddNoteButton").addEventListener("click", showAddNoteForm);
       document.querySelector("#confirmAddNoteButton").addEventListener("click", confirmAddNote);
       document.querySelector("#cancelAddNoteButton").addEventListener("click", hideAddNoteForm);
+      document.querySelector("#togglePinNoteMenuItem").addEventListener("click", () => togglePinNote(menuNote()));
+      document.querySelector("#toggleFavoriteNoteMenuItem").addEventListener("click", () => toggleFavoriteNote(menuNote()));
       document.querySelector("#deleteNoteMenuItem").addEventListener("click", () => deleteNote(menuNote()));
+      noteSearchInput.addEventListener("input", () => {
+        searchQuery = noteSearchInput.value;
+        renderCategories();
+      });
+      backupNotebookButton.addEventListener("click", backupNotebook);
       headingOneButton.addEventListener("click", () => insertHeading(1));
       headingTwoButton.addEventListener("click", () => insertHeading(2));
       insertCodeBlockButton.addEventListener("click", insertCodeBlock);
+      copyMarkdownButton.addEventListener("click", copyMarkdown);
       document.querySelector("#exportButton").addEventListener("click", exportMarkdown);
       preview.addEventListener("click", (event) => {
         const button = event.target.closest(".copy-code-button");
         if (button) copyCodeBlock(button);
       });
       noteTitleInput.addEventListener("input", updateActiveNote);
+      noteTagsInput.addEventListener("input", updateActiveNote);
       noteContentInput.addEventListener("input", updateActiveNote);
       newNoteTitleInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") confirmAddNote();

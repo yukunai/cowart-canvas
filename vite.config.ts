@@ -39,6 +39,9 @@ type NotebookNote = {
   id: string
   title: string
   content: string
+  tags?: string[]
+  pinned?: boolean
+  favorite?: boolean
   updatedAt?: string
   filePath?: string
 }
@@ -371,6 +374,10 @@ function getNotebookDirectory() {
   return path.join(os.homedir(), '.cowart-canvas', 'text-notes')
 }
 
+function getNotebookBackupDirectory() {
+  return path.join(os.homedir(), '.cowart-canvas', 'text-note-backups')
+}
+
 function createDefaultNotebookData(): NotebookData {
   const categoryId = `category-${Date.now()}`
   const noteId = `note-${Date.now()}`
@@ -386,6 +393,9 @@ function createDefaultNotebookData(): NotebookData {
             id: noteId,
             title: '第一篇 Markdown',
             content: '# 第一篇 Markdown\n\n- 可以建分类\n- 可以写多篇内容\n- 右侧会实时预览\n\n> 数据会保存到本机文件夹。',
+            tags: ['示例'],
+            pinned: false,
+            favorite: false,
             updatedAt: new Date().toISOString(),
           },
         ],
@@ -405,6 +415,9 @@ function normalizeNotebookData(value: unknown): NotebookData {
         id: getString(note.id) || `note-${categoryIndex + 1}-${noteIndex + 1}`,
         title: getString(note.title) || '未命名笔记',
         content: getString(note.content) || '',
+        tags: Array.isArray(note.tags) ? note.tags.map(String).filter(Boolean) : [],
+        pinned: Boolean(note.pinned),
+        favorite: Boolean(note.favorite),
         updatedAt: getString(note.updatedAt) || new Date().toISOString(),
       }))
       return {
@@ -450,6 +463,9 @@ function saveNotebookData(input: unknown): NotebookData & { storagePath: string;
       return {
         id: note.id,
         title: note.title,
+        tags: note.tags ?? [],
+        pinned: Boolean(note.pinned),
+        favorite: Boolean(note.favorite),
         updatedAt: note.updatedAt || new Date().toISOString(),
         filePath: notePath,
       }
@@ -491,6 +507,9 @@ function loadNotebookData(): NotebookData & { storagePath: string; updatedAt: st
         id: getString(note.id) || `note-${categoryIndex + 1}-${noteIndex + 1}`,
         title: getString(note.title) || notebookSafeFileName(path.basename(filePath || '', '.md'), '未命名笔记'),
         content,
+        tags: Array.isArray(note.tags) ? note.tags.map(String).filter(Boolean) : [],
+        pinned: Boolean(note.pinned),
+        favorite: Boolean(note.favorite),
         updatedAt: getString(note.updatedAt) || (filePath ? new Date(fs.statSync(filePath).mtimeMs).toISOString() : new Date().toISOString()),
         filePath,
       }
@@ -507,6 +526,22 @@ function loadNotebookData(): NotebookData & { storagePath: string; updatedAt: st
     categories,
     storagePath: directory,
     updatedAt: getString(record.updatedAt) || new Date().toISOString(),
+  }
+}
+
+function backupNotebookData() {
+  const sourceDirectory = getNotebookDirectory()
+  if (!fs.existsSync(sourceDirectory)) saveNotebookData(createDefaultNotebookData())
+
+  const backupRoot = getNotebookBackupDirectory()
+  fs.mkdirSync(backupRoot, { recursive: true })
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const backupPath = path.join(backupRoot, stamp)
+  fs.cpSync(sourceDirectory, backupPath, { recursive: true })
+  return {
+    backupPath,
+    storagePath: sourceDirectory,
+    updatedAt: new Date().toISOString(),
   }
 }
 
@@ -2054,6 +2089,20 @@ function localImageImportPlugin(): PluginOption {
         } catch {
           res.statusCode = 500
           sendJson(res, { images: [], error: 'Could not list recent downloaded images' })
+        }
+      })
+
+      server.middlewares.use('/api/notebook-backup', (req: Connect.IncomingMessage, res: ServerResponse) => {
+        try {
+          if (req.method !== 'POST') {
+            res.statusCode = 405
+            sendJson(res, { error: 'Method not allowed' })
+            return
+          }
+          sendJson(res, backupNotebookData())
+        } catch (error) {
+          res.statusCode = 500
+          sendJson(res, { error: error instanceof Error ? error.message : 'Could not backup notebook' })
         }
       })
 
