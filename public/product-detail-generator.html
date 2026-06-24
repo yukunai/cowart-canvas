@@ -108,8 +108,8 @@
       }
 
       .mode-nav button {
-        flex: 0 0 76px;
-        width: 76px;
+        flex: 0 0 60px;
+        width: 60px;
         min-height: 34px;
         padding: 0 10px;
         color: #24313f;
@@ -122,6 +122,7 @@
         background: #eaf2ff;
         color: #164ea6;
       }
+
 
       h1,
       h2,
@@ -447,6 +448,7 @@
             <button type="button" class="active" id="designButton">设计</button>
             <button type="button" id="videoButton">视频</button>
             <button type="button" id="canvasButton">画布</button>
+            <button type="button" id="notebookButton">文本</button>
           </div>
           <p>上传主产品图和参考图，填写卖点、风格和模块结构。</p>
         </section>
@@ -1075,6 +1077,9 @@
       });
       document.querySelector("#canvasButton").addEventListener("click", () => {
         window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1` : "/?installed=1";
+      });
+      document.querySelector("#notebookButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/notebook.html` : "/notebook.html";
       });
 
       const dropZone = document.querySelector("#dropZone");

@@ -112,8 +112,8 @@
       }
 
       .mode-nav button {
-        flex: 0 0 76px;
-        width: 76px;
+        flex: 0 0 60px;
+        width: 60px;
         min-height: 34px;
         padding: 0 10px;
         color: #24313f;
@@ -126,6 +126,7 @@
         background: #eaf2ff;
         color: #164ea6;
       }
+
 
       h1 {
         margin: 0;
@@ -594,6 +595,7 @@
             <button type="button" id="productDetailButton">设计</button>
             <button type="button" id="videoButton">视频</button>
             <button type="button" id="backButton">画布</button>
+            <button type="button" id="notebookButton">文本</button>
           </div>
           <p>上传、粘贴或拖入一张底图，选择 API 后生成。结果会直接显示在右侧，也会保存到本机任务目录。</p>
         </section>
@@ -1265,6 +1267,9 @@
       });
       document.querySelector("#videoButton").addEventListener("click", () => {
         window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1&video=1` : "/?installed=1&video=1";
+      });
+      document.querySelector("#notebookButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/notebook.html` : "/notebook.html";
       });
       document.querySelector("#settingsButton").addEventListener("click", () => settingsPanel.classList.toggle("visible"));
       providerSelect.addEventListener("change", () => {

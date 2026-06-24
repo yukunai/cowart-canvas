@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cowart 文本</title>
+    <style>
+      :root {
+        color: #1f2937;
+        background: #f4f7fb;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button,
+      input,
+      textarea {
+        border: 1px solid #cfd9e6;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #253244;
+      }
+
+      button {
+        min-height: 34px;
+        padding: 0 12px;
+        font-weight: 760;
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: #8fb3f5;
+        color: #185abc;
+      }
+
+      .primary {
+        border-color: #1f6feb;
+        background: #2672ea;
+        color: #ffffff;
+      }
+
+      .primary:hover {
+        border-color: #1d5fd3;
+        background: #1f64d6;
+        color: #ffffff;
+      }
+
+      .danger {
+        border-color: #fecaca;
+        color: #b42318;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 260px 320px minmax(0, 1fr);
+        height: 100vh;
+        min-height: 720px;
+      }
+
+      .categories,
+      .notes {
+        overflow: auto;
+        border-right: 1px solid #dce3eb;
+        background: #ffffff;
+      }
+
+      .panel {
+        display: grid;
+        gap: 12px;
+        border-bottom: 1px solid #edf1f6;
+        padding: 16px 20px;
+      }
+
+      .mode-nav {
+        display: flex;
+        gap: 8px;
+      }
+
+      .mode-nav button {
+        flex: 0 0 60px;
+        width: 60px;
+        min-height: 34px;
+        color: #24313f;
+        font-size: 13px;
+        font-weight: 780;
+        padding: 0 10px;
+      }
+
+      .mode-nav button.active {
+        border-color: #1f6feb;
+        background: #eaf2ff;
+        color: #164ea6;
+      }
+
+      .utility-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .utility-row button {
+        flex: 1;
+      }
+
+      .list {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+      }
+
+      .item {
+        display: grid;
+        gap: 4px;
+        width: 100%;
+        min-height: 52px;
+        border: 1px solid #d8e0e8;
+        border-radius: 9px;
+        background: #ffffff;
+        color: #24313f;
+        text-align: left;
+        padding: 10px;
+      }
+
+      .item.active {
+        border-color: #1f6feb;
+        background: #eff6ff;
+        box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.12);
+      }
+
+      .item strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .item span {
+        overflow: hidden;
+        color: #607083;
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .editor {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        border-bottom: 1px solid #dce3eb;
+        background: #ffffff;
+        padding: 14px 18px;
+      }
+
+      .title-input {
+        min-height: 38px;
+        font-size: 18px;
+        font-weight: 780;
+        padding: 0 12px;
+      }
+
+      .editor-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .markdown-editor,
+      .preview {
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .markdown-editor {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        border-right: 1px solid #dce3eb;
+        border-radius: 0;
+        background: #ffffff;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 14px;
+        line-height: 1.65;
+        outline: none;
+        padding: 18px;
+        resize: none;
+      }
+
+      .preview {
+        overflow: auto;
+        background: #fbfdff;
+        color: #1f2937;
+        line-height: 1.7;
+        padding: 20px 24px;
+      }
+
+      .preview h1,
+      .preview h2,
+      .preview h3 {
+        margin: 18px 0 8px;
+        line-height: 1.25;
+      }
+
+      .preview h1 {
+        font-size: 26px;
+      }
+
+      .preview h2 {
+        font-size: 21px;
+      }
+
+      .preview h3 {
+        font-size: 17px;
+      }
+
+      .preview p,
+      .preview ul,
+      .preview ol,
+      .preview pre,
+      .preview blockquote {
+        margin: 0 0 12px;
+      }
+
+      .preview code {
+        border-radius: 5px;
+        background: #eef2f7;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        padding: 2px 5px;
+      }
+
+      .preview pre {
+        overflow: auto;
+        border-radius: 8px;
+        background: #111827;
+        color: #f8fafc;
+        padding: 12px;
+      }
+
+      .preview pre code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+      }
+
+      .preview blockquote {
+        border-left: 3px solid #9db4d0;
+        color: #526170;
+        padding-left: 12px;
+      }
+
+      .empty {
+        display: grid;
+        place-items: center;
+        color: #607083;
+        padding: 24px;
+        text-align: center;
+      }
+
+      @media (max-width: 980px) {
+        .app {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+
+        .editor-body {
+          grid-template-columns: 1fr;
+        }
+
+        .markdown-editor {
+          min-height: 320px;
+          border-right: 0;
+          border-bottom: 1px solid #dce3eb;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <aside class="categories">
+        <section class="panel">
+          <div class="mode-nav">
+            <button type="button" id="imageButton">图片</button>
+            <button type="button" id="designButton">设计</button>
+            <button type="button" id="videoButton">视频</button>
+            <button type="button" id="canvasButton">画布</button>
+            <button type="button" class="active" id="textButton">文本</button>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="utility-row">
+            <button type="button" class="primary" id="addCategoryButton">新分类</button>
+            <button type="button" class="danger" id="deleteCategoryButton">删分类</button>
+          </div>
+          <input id="categoryNameInput" placeholder="分类名称" />
+        </section>
+        <div class="list" id="categoryList"></div>
+      </aside>
+
+      <aside class="notes">
+        <section class="panel">
+          <div class="utility-row">
+            <button type="button" class="primary" id="addNoteButton">新笔记</button>
+            <button type="button" class="danger" id="deleteNoteButton">删笔记</button>
+          </div>
+          <input id="noteSearchInput" placeholder="搜索当前分类" />
+        </section>
+        <div class="list" id="noteList"></div>
+      </aside>
+
+      <section class="editor">
+        <header class="topbar">
+          <input class="title-input" id="noteTitleInput" placeholder="笔记标题" />
+          <button type="button" id="exportButton">导出 Markdown</button>
+        </header>
+        <div class="editor-body">
+          <textarea class="markdown-editor" id="noteContentInput" placeholder="在这里写 Markdown..."></textarea>
+          <article class="preview" id="preview"></article>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const storageKey = "cowart-markdown-notebook";
+      const apiBase = location.protocol === "file:" ? "http://127.0.0.1:43219" : "";
+      let data = loadNotebook();
+      let activeCategoryId = data.activeCategoryId || data.categories[0]?.id;
+      let activeNoteId = data.activeNoteId || data.categories[0]?.notes[0]?.id;
+
+      const categoryList = document.querySelector("#categoryList");
+      const noteList = document.querySelector("#noteList");
+      const categoryNameInput = document.querySelector("#categoryNameInput");
+      const noteSearchInput = document.querySelector("#noteSearchInput");
+      const noteTitleInput = document.querySelector("#noteTitleInput");
+      const noteContentInput = document.querySelector("#noteContentInput");
+      const preview = document.querySelector("#preview");
+
+      function createId(prefix) {
+        return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+      }
+
+      function createDefaultNotebook() {
+        const categoryId = createId("category");
+        const noteId = createId("note");
+        return {
+          activeCategoryId: categoryId,
+          activeNoteId: noteId,
+          categories: [
+            {
+              id: categoryId,
+              name: "默认分类",
+              notes: [
+                {
+                  id: noteId,
+                  title: "第一篇 Markdown",
+                  content: "# 第一篇 Markdown\n\n- 可以建分类\n- 可以写多篇内容\n- 右侧会实时预览\n\n> 数据保存在本机浏览器 localStorage。",
+                  updatedAt: new Date().toISOString(),
+                },
+              ],
+            },
+          ],
+        };
+      }
+
+      function loadNotebook() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(storageKey) || "null");
+          if (parsed?.categories?.length) return parsed;
+        } catch {}
+        return createDefaultNotebook();
+      }
+
+      function saveNotebook() {
+        data.activeCategoryId = activeCategoryId;
+        data.activeNoteId = activeNoteId;
+        localStorage.setItem(storageKey, JSON.stringify(data, null, 2));
+      }
+
+      function activeCategory() {
+        return data.categories.find((category) => category.id === activeCategoryId) || data.categories[0];
+      }
+
+      function activeNote() {
+        const category = activeCategory();
+        return category?.notes.find((note) => note.id === activeNoteId) || category?.notes[0];
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function renderMarkdown(markdown) {
+        const lines = String(markdown || "").split(/\r?\n/);
+        const html = [];
+        let inCode = false;
+        let listOpen = false;
+        for (const rawLine of lines) {
+          const line = rawLine;
+          if (line.trim().startsWith("```")) {
+            if (listOpen) {
+              html.push("</ul>");
+              listOpen = false;
+            }
+            html.push(inCode ? "</code></pre>" : "<pre><code>");
+            inCode = !inCode;
+            continue;
+          }
+          if (inCode) {
+            html.push(`${escapeHtml(line)}\n`);
+            continue;
+          }
+          if (/^\s*[-*]\s+/.test(line)) {
+            if (!listOpen) {
+              html.push("<ul>");
+              listOpen = true;
+            }
+            html.push(`<li>${inlineMarkdown(line.replace(/^\s*[-*]\s+/, ""))}</li>`);
+            continue;
+          }
+          if (listOpen) {
+            html.push("</ul>");
+            listOpen = false;
+          }
+          if (line.startsWith("### ")) html.push(`<h3>${inlineMarkdown(line.slice(4))}</h3>`);
+          else if (line.startsWith("## ")) html.push(`<h2>${inlineMarkdown(line.slice(3))}</h2>`);
+          else if (line.startsWith("# ")) html.push(`<h1>${inlineMarkdown(line.slice(2))}</h1>`);
+          else if (line.startsWith("> ")) html.push(`<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`);
+          else if (line.trim() === "") html.push("");
+          else html.push(`<p>${inlineMarkdown(line)}</p>`);
+        }
+        if (listOpen) html.push("</ul>");
+        if (inCode) html.push("</code></pre>");
+        return html.join("\n");
+      }
+
+      function inlineMarkdown(value) {
+        return escapeHtml(value)
+          .replace(/`([^`]+)`/g, "<code>$1</code>")
+          .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+          .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+      }
+
+      function renderCategories() {
+        categoryList.innerHTML = "";
+        for (const category of data.categories) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `item ${category.id === activeCategoryId ? "active" : ""}`;
+          button.innerHTML = `<strong>${escapeHtml(category.name)}</strong><span>${category.notes.length} 篇</span>`;
+          button.addEventListener("click", () => {
+            activeCategoryId = category.id;
+            activeNoteId = category.notes[0]?.id;
+            saveNotebook();
+            renderAll();
+          });
+          categoryList.appendChild(button);
+        }
+      }
+
+      function renderNotes() {
+        const category = activeCategory();
+        const keyword = noteSearchInput.value.trim().toLowerCase();
+        noteList.innerHTML = "";
+        if (!category) {
+          noteList.innerHTML = "<div class='empty'>还没有分类。</div>";
+          return;
+        }
+        const notes = category.notes.filter((note) => `${note.title}\n${note.content}`.toLowerCase().includes(keyword));
+        for (const note of notes) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `item ${note.id === activeNoteId ? "active" : ""}`;
+          button.innerHTML = `<strong>${escapeHtml(note.title || "未命名笔记")}</strong><span>${new Date(note.updatedAt).toLocaleString()}</span>`;
+          button.addEventListener("click", () => {
+            activeNoteId = note.id;
+            saveNotebook();
+            renderEditor();
+            renderNotes();
+          });
+          noteList.appendChild(button);
+        }
+        if (notes.length === 0) noteList.innerHTML = "<div class='empty'>没有匹配的笔记。</div>";
+      }
+
+      function renderEditor() {
+        const note = activeNote();
+        const disabled = !note;
+        noteTitleInput.disabled = disabled;
+        noteContentInput.disabled = disabled;
+        document.querySelector("#exportButton").disabled = disabled;
+        if (!note) {
+          noteTitleInput.value = "";
+          noteContentInput.value = "";
+          preview.innerHTML = "<div class='empty'>选择或新建一篇笔记。</div>";
+          return;
+        }
+        noteTitleInput.value = note.title;
+        noteContentInput.value = note.content;
+        preview.innerHTML = renderMarkdown(note.content);
+      }
+
+      function renderAll() {
+        renderCategories();
+        renderNotes();
+        renderEditor();
+      }
+
+      function addCategory() {
+        const name = categoryNameInput.value.trim() || "新分类";
+        const category = { id: createId("category"), name, notes: [] };
+        data.categories.unshift(category);
+        activeCategoryId = category.id;
+        activeNoteId = undefined;
+        categoryNameInput.value = "";
+        saveNotebook();
+        renderAll();
+      }
+
+      function deleteCategory() {
+        const category = activeCategory();
+        if (!category) return;
+        if (!window.confirm(`确定删除分类“${category.name}”以及其中 ${category.notes.length} 篇笔记吗？`)) return;
+        data.categories = data.categories.filter((item) => item.id !== category.id);
+        if (data.categories.length === 0) data = createDefaultNotebook();
+        activeCategoryId = data.categories[0]?.id;
+        activeNoteId = data.categories[0]?.notes[0]?.id;
+        saveNotebook();
+        renderAll();
+      }
+
+      function addNote() {
+        const category = activeCategory();
+        if (!category) return;
+        const note = {
+          id: createId("note"),
+          title: "新笔记",
+          content: "# 新笔记\n\n",
+          updatedAt: new Date().toISOString(),
+        };
+        category.notes.unshift(note);
+        activeNoteId = note.id;
+        saveNotebook();
+        renderAll();
+      }
+
+      function deleteNote() {
+        const category = activeCategory();
+        const note = activeNote();
+        if (!category || !note) return;
+        if (!window.confirm(`确定删除笔记“${note.title || "未命名笔记"}”吗？`)) return;
+        category.notes = category.notes.filter((item) => item.id !== note.id);
+        activeNoteId = category.notes[0]?.id;
+        saveNotebook();
+        renderAll();
+      }
+
+      function updateActiveNote() {
+        const note = activeNote();
+        if (!note) return;
+        note.title = noteTitleInput.value;
+        note.content = noteContentInput.value;
+        note.updatedAt = new Date().toISOString();
+        preview.innerHTML = renderMarkdown(note.content);
+        saveNotebook();
+        renderNotes();
+      }
+
+      function exportMarkdown() {
+        const note = activeNote();
+        if (!note) return;
+        const blob = new Blob([note.content], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${(note.title || "note").replace(/[\\/:*?"<>|]+/g, "-")}.md`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      document.querySelector("#imageButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/image-generator.html` : "/image-generator.html";
+      });
+      document.querySelector("#designButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/product-detail-generator.html` : "/product-detail-generator.html";
+      });
+      document.querySelector("#videoButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1&video=1` : "/?installed=1&video=1";
+      });
+      document.querySelector("#canvasButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1` : "/?installed=1";
+      });
+      document.querySelector("#addCategoryButton").addEventListener("click", addCategory);
+      document.querySelector("#deleteCategoryButton").addEventListener("click", deleteCategory);
+      document.querySelector("#addNoteButton").addEventListener("click", addNote);
+      document.querySelector("#deleteNoteButton").addEventListener("click", deleteNote);
+      document.querySelector("#exportButton").addEventListener("click", exportMarkdown);
+      noteSearchInput.addEventListener("input", renderNotes);
+      noteTitleInput.addEventListener("input", updateActiveNote);
+      noteContentInput.addEventListener("input", updateActiveNote);
+
+      renderAll();
+    </script>
+  </body>
+</html>

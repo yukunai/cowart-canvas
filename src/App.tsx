@@ -2267,6 +2267,15 @@ function App() {
             >
               {tr('画布', 'Canvas')}
             </button>
+            <button
+              type="button"
+              className="mode-entry-button"
+              onClick={() => {
+                window.location.href = '/notebook.html'
+              }}
+            >
+              {tr('文本', 'Text')}
+            </button>
           </div>
           <label className="language-select">
             <Globe2 size={14} />

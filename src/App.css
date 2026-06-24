@@ -59,6 +59,15 @@ select {
   padding: 0 10px;
 }
 
+.utility-link {
+  justify-self: start;
+  min-height: 30px;
+  border-color: #d8e0e8;
+  color: #526170;
+  font-size: 12px;
+  padding: 0 10px;
+}
+
 .language-select select {
   flex: 1;
   min-width: 0;
@@ -140,8 +149,8 @@ textarea {
 }
 
 .mode-entry-button {
-  flex: 0 0 76px;
-  width: 76px;
+  flex: 0 0 60px;
+  width: 60px;
   min-height: 34px;
   padding: 0 10px;
   font-size: 13px;
@@ -157,8 +166,8 @@ textarea {
 }
 
 .video-entry-button {
-  flex: 0 0 76px;
-  width: 76px;
+  flex: 0 0 60px;
+  width: 60px;
   min-height: 34px;
   padding: 0 10px;
   color: #24313f;
