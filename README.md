@@ -2,11 +2,11 @@
 
 **Languages:** [English](README.md) | [简体中文](README.zh-CN.md)
 
-Cowart Canvas is a local browser canvas for marking exactly where an AI image should be edited, then turning those visual notes into a Codex-ready request or a direct image-edit API call. It also includes a local image-to-video task panel with front-end API settings and video history.
+Cowart Canvas is a local creative workbench for AI image editing, image generation, image-to-video tasks, product-detail design, and Markdown notes. Its core workflow is simple: put an image on a canvas, mark the exact places that need changes, then turn those visual notes into a Codex-ready edit request or a direct image-edit API call.
 
 The interface is bilingual: Chinese and English are both built in, and users can switch languages from the top-left toolbar.
 
-The app runs on your own machine. Imported images, generated task files, video task files, and API keys stay local unless you send them to a provider yourself.
+The app runs on your own machine. Imported images, generated task files, video task files, Markdown notes, backups, and API keys stay local unless you send them to a provider yourself.
 
 ## Screenshots
 
@@ -49,7 +49,7 @@ The app runs on your own machine. Imported images, generated task files, video t
 - Send the annotated image task directly to image generation/editing APIs for fal.ai, Alibaba Wanxiang, Volcengine Ark, and Kling.
 - Choose image generation aspect ratios such as auto/source, 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, and 2:3.
 - Use the standalone Product Detail Generator page to create ecommerce product-detail images from a main product image, reference images, selling points, modules, brand tone, and image APIs.
-- Use the standalone Text page for categorized Markdown notes, multi-note management, live preview, and Markdown export.
+- Use the standalone Text page for categorized Markdown notes, templates, tags, search, pinned/favorite notes, live preview, code block copy buttons, Markdown export, and local backups.
 - Switch the full interface between Chinese and English.
 - Create image-to-video tasks from 1 to 5 reference images.
 - Configure video provider API keys in the front-end settings panel or `.env.local`.
@@ -95,6 +95,12 @@ Standalone Text page:
 
 ```text
 http://127.0.0.1:43219/notebook.html
+```
+
+Standalone image generation / editing page:
+
+```text
+http://127.0.0.1:43219/image-generator.html
 ```
 
 ## macOS Background Service
@@ -158,6 +164,45 @@ http://127.0.0.1:43219/image-generator.html
 ```
 
 The standalone image page supports one source image, up to five reference images, aspect ratio selection, a negative prompt field, and a `Skill / Generation Strategy` selector for strict local editing, portrait identity, reference fusion, style reference, or commercial product imagery. You can also upload custom Skill JSON files, install them into the local browser list, and download the current Skill as a reusable JSON file.
+
+## Text / Markdown Notes
+
+Open:
+
+```text
+http://127.0.0.1:43219/notebook.html
+```
+
+The Text page is a small local Markdown notebook for prompts, code snippets, edit instructions, planning notes, and reusable workflows. It is intentionally built into Cowart so image/video/design work and written instructions can live beside each other.
+
+Text page features:
+
+- Create categories and rename or delete them from the category context menu.
+- Create a new note from the `New Note` button, choose its category, and start from a template.
+- Built-in templates include blank notes, code notes, prompt records, project plans, bug records, and meeting notes.
+- Search across category names, note titles, note content, and tags. Matching categories expand so the matching notes are visible.
+- Add comma-separated tags to each note.
+- Right-click a note to pin it or mark it as favorite. Pinned notes stay at the top of their category.
+- Use `H1` and `H2` buttons to insert headings. The preview automatically creates a table of contents when there is more than one heading.
+- Insert fenced code blocks with a language selector such as JavaScript, TypeScript, Python, Bash, JSON, Markdown, or Text.
+- Copy a single rendered code block from the preview with the copy icon.
+- Copy the full Markdown note or export it as a `.md` file.
+- Drag the left divider to resize the note/category sidebar.
+- Click `Backup` to create a local backup copy of all notes.
+
+The browser keeps a local fallback copy, and the dev server writes Markdown notes to:
+
+```text
+~/.cowart-canvas/text-notes
+```
+
+Manual backups are written to:
+
+```text
+~/.cowart-canvas/text-note-backups
+```
+
+These note folders are local runtime data and are not committed to the repository.
 
 ## Image To Video
 
@@ -225,6 +270,8 @@ The following local/runtime folders are ignored:
 - `.playwright-cli`
 - `codex-image-tasks`
 - `video-tasks`
+- `text-notes`
+- `text-note-backups`
 - `.env.local`
 - desktop packaging outputs
 
