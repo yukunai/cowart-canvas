@@ -147,21 +147,23 @@
 
       .item {
         display: grid;
-        gap: 4px;
+        gap: 2px;
         width: 100%;
-        min-height: 40px;
+        min-height: 32px;
         border: 0;
         border-radius: 6px;
         background: transparent;
         color: #24313f;
+        font-size: 13px;
+        line-height: 1.25;
         text-align: left;
-        padding: 8px 10px;
+        padding: 6px 9px;
       }
 
       .category-item {
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
-        min-height: 38px;
+        min-height: 32px;
         position: relative;
       }
 
@@ -181,13 +183,15 @@
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
         width: 100%;
-        min-height: 32px;
+        min-height: 28px;
         border: 0;
         border-radius: 5px;
         background: transparent;
         color: #344054;
+        font-size: 13px;
+        line-height: 1.25;
         text-align: left;
-        padding: 6px 9px;
+        padding: 5px 9px;
       }
 
       .item:hover,
@@ -203,7 +207,7 @@
 
       .note-tree-item span {
         color: #8090a3;
-        font-size: 11px;
+        font-size: 10px;
       }
 
       .inline-rename {
@@ -244,9 +248,9 @@
       .category-item.active::before {
         position: absolute;
         left: 0;
-        top: 9px;
+        top: 7px;
         width: 3px;
-        height: calc(100% - 18px);
+        height: calc(100% - 14px);
         border-radius: 999px;
         background: #1f6feb;
         content: "";
@@ -254,6 +258,7 @@
 
       .item strong {
         overflow: hidden;
+        font-weight: 680;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
@@ -261,7 +266,7 @@
       .item span {
         overflow: hidden;
         color: #607083;
-        font-size: 12px;
+        font-size: 10px;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
