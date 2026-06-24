@@ -66,13 +66,12 @@
 
       .app {
         display: grid;
-        grid-template-columns: var(--category-width, 260px) 12px var(--note-width, 320px) 12px minmax(0, 1fr);
+        grid-template-columns: var(--category-width, 320px) 12px minmax(0, 1fr);
         height: 100vh;
         min-height: 720px;
       }
 
-      .categories,
-      .notes {
+      .categories {
         overflow: auto;
         border-right: 1px solid #dce3eb;
         background: #ffffff;
@@ -137,7 +136,7 @@
       }
 
       .category-actions {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       }
 
       .list {
@@ -163,6 +162,71 @@
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
         min-height: 42px;
+      }
+
+      .category-group {
+        display: grid;
+        gap: 6px;
+      }
+
+      .category-note-list {
+        display: grid;
+        gap: 6px;
+        padding-left: 14px;
+      }
+
+      .note-tree-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        width: 100%;
+        min-height: 36px;
+        border: 1px solid #e1e8f0;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: #344054;
+        text-align: left;
+        padding: 7px 9px;
+      }
+
+      .note-tree-item.active {
+        border-color: #1f6feb;
+        background: #eff6ff;
+        color: #164ea6;
+      }
+
+      .note-tree-item span {
+        color: #8090a3;
+        font-size: 11px;
+      }
+
+      .inline-rename {
+        width: 100%;
+        min-height: 34px;
+        padding: 0 10px;
+      }
+
+      .note-create-card {
+        display: none;
+        gap: 8px;
+        border-bottom: 1px solid #edf1f6;
+        padding: 0 20px 16px;
+      }
+
+      .note-create-card.open {
+        display: grid;
+      }
+
+      .note-create-card select,
+      .note-create-card input {
+        min-height: 36px;
+        padding: 0 10px;
+      }
+
+      .note-create-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 8px;
       }
 
       .item.active {
@@ -383,25 +447,21 @@
         <section class="panel">
           <div class="utility-row category-actions">
             <button type="button" class="primary" id="addCategoryButton">分类</button>
+            <button type="button" id="showAddNoteButton">新笔记</button>
+          </div>
+        </section>
+        <section class="note-create-card" id="noteCreateCard">
+          <select id="noteCategorySelect" aria-label="选择分类"></select>
+          <input id="newNoteTitleInput" placeholder="笔记标题" />
+          <div class="note-create-actions">
+            <button type="button" class="primary" id="confirmAddNoteButton">创建</button>
+            <button type="button" id="cancelAddNoteButton">取消</button>
           </div>
         </section>
         <div class="list" id="categoryList"></div>
       </aside>
 
       <button type="button" class="pane-resizer" id="categoryResizer" aria-label="调整分类宽度"></button>
-
-      <aside class="notes">
-        <section class="panel">
-          <div class="utility-row">
-            <button type="button" class="primary" id="addNoteButton">新笔记</button>
-            <button type="button" class="danger" id="deleteNoteButton">删笔记</button>
-          </div>
-          <input id="noteSearchInput" placeholder="搜索当前分类" />
-        </section>
-        <div class="list" id="noteList"></div>
-      </aside>
-
-      <button type="button" class="pane-resizer" id="noteResizer" aria-label="调整笔记列表宽度"></button>
 
       <section class="editor">
         <header class="topbar">
@@ -419,6 +479,9 @@
       <button type="button" id="renameCategoryMenuItem">改名</button>
       <button type="button" class="danger" id="deleteCategoryMenuItem">删除</button>
     </div>
+    <div class="context-menu" id="noteMenu" role="menu">
+      <button type="button" class="danger" id="deleteNoteMenuItem">删除笔记</button>
+    </div>
 
     <script>
       const storageKey = "cowart-markdown-notebook";
@@ -429,17 +492,21 @@
       let storagePath = data.storagePath || "";
       let saveTimer = null;
       let menuCategoryId = "";
+      let menuNoteId = "";
+      let editingCategoryId = "";
       let hasLocalChanges = false;
 
       const categoryList = document.querySelector("#categoryList");
-      const noteList = document.querySelector("#noteList");
-      const noteSearchInput = document.querySelector("#noteSearchInput");
       const noteTitleInput = document.querySelector("#noteTitleInput");
       const noteContentInput = document.querySelector("#noteContentInput");
       const preview = document.querySelector("#preview");
       const exportButton = document.querySelector("#exportButton");
       const storagePathText = document.querySelector("#storagePathText");
       const categoryMenu = document.querySelector("#categoryMenu");
+      const noteMenu = document.querySelector("#noteMenu");
+      const noteCreateCard = document.querySelector("#noteCreateCard");
+      const noteCategorySelect = document.querySelector("#noteCategorySelect");
+      const newNoteTitleInput = document.querySelector("#newNoteTitleInput");
 
       function clamp(value, min, max) {
         return Math.min(max, Math.max(min, value));
@@ -447,8 +514,10 @@
 
       function startPaneResize(event, cssVar, min, max) {
         event.preventDefault();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
         const startX = event.clientX;
-        const startValue = parseInt(getComputedStyle(document.documentElement).getPropertyValue(cssVar), 10) || (cssVar.includes("category") ? 260 : 320);
+        const measuredWidth = cssVar.includes("category") ? document.querySelector(".categories").getBoundingClientRect().width : 320;
+        const startValue = parseInt(getComputedStyle(document.documentElement).getPropertyValue(cssVar), 10) || measuredWidth;
         const onMove = (moveEvent) => {
           const next = clamp(startValue + moveEvent.clientX - startX, min, max);
           document.documentElement.style.setProperty(cssVar, `${Math.round(next)}px`);
@@ -582,6 +651,14 @@
         return data.categories.find((category) => category.id === id);
       }
 
+      function categoryForNote(noteId) {
+        return data.categories.find((category) => category.notes.some((note) => note.id === noteId));
+      }
+
+      function noteById(noteId) {
+        return categoryForNote(noteId)?.notes.find((note) => note.id === noteId);
+      }
+
       function activeNote() {
         const category = activeCategory();
         return category?.notes.find((note) => note.id === activeNoteId) || category?.notes[0];
@@ -650,52 +727,82 @@
       function renderCategories() {
         categoryList.innerHTML = "";
         for (const category of data.categories) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = `item category-item ${category.id === activeCategoryId ? "active" : ""}`;
-          button.innerHTML = `<strong>${escapeHtml(category.name)}</strong><span>${category.notes.length} 篇</span>`;
-          button.addEventListener("click", () => {
-            activeCategoryId = category.id;
-            activeNoteId = category.notes[0]?.id;
-            saveNotebook();
-            renderAll();
-          });
-          button.addEventListener("contextmenu", (event) => {
-            event.preventDefault();
-            activeCategoryId = category.id;
-            activeNoteId = category.notes[0]?.id;
-            menuCategoryId = category.id;
-            saveNotebook();
-            renderAll();
-            showCategoryMenu(event.clientX, event.clientY);
-          });
-          categoryList.appendChild(button);
-        }
-      }
+          const group = document.createElement("div");
+          group.className = "category-group";
 
-      function renderNotes() {
-        const category = activeCategory();
-        const keyword = noteSearchInput.value.trim().toLowerCase();
-        noteList.innerHTML = "";
-        if (!category) {
-          noteList.innerHTML = "<div class='empty'>还没有分类。</div>";
-          return;
+          if (editingCategoryId === category.id) {
+            const input = document.createElement("input");
+            input.className = "inline-rename";
+            input.value = category.name;
+            input.addEventListener("keydown", (event) => {
+              if (event.key === "Enter") input.blur();
+              if (event.key === "Escape") {
+                editingCategoryId = "";
+                renderCategories();
+              }
+            });
+            input.addEventListener("blur", () => finishRenameCategory(category, input.value));
+            group.appendChild(input);
+            setTimeout(() => {
+              input.focus();
+              input.select();
+            }, 0);
+          } else {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = `item category-item ${category.id === activeCategoryId ? "active" : ""}`;
+            button.innerHTML = `<strong>${escapeHtml(category.name)}</strong><span>${category.notes.length} 篇</span>`;
+            button.addEventListener("click", () => {
+              activeCategoryId = category.id;
+              activeNoteId = category.notes[0]?.id;
+              saveNotebook();
+              renderAll();
+            });
+            button.addEventListener("contextmenu", (event) => {
+              event.preventDefault();
+              activeCategoryId = category.id;
+              activeNoteId = category.notes[0]?.id;
+              menuCategoryId = category.id;
+              saveNotebook();
+              renderAll();
+              showContextMenu(categoryMenu, event.clientX, event.clientY);
+            });
+            group.appendChild(button);
+          }
+
+          if (category.id === activeCategoryId) {
+            const noteListElement = document.createElement("div");
+            noteListElement.className = "category-note-list";
+            if (category.notes.length === 0) {
+              noteListElement.innerHTML = "<div class='empty'>这个分类里还没有笔记。</div>";
+            }
+            for (const note of category.notes) {
+              const noteButton = document.createElement("button");
+              noteButton.type = "button";
+              noteButton.className = `note-tree-item ${note.id === activeNoteId ? "active" : ""}`;
+              noteButton.innerHTML = `<strong>${escapeHtml(note.title || "未命名笔记")}</strong><span>${new Date(note.updatedAt).toLocaleDateString()}</span>`;
+              noteButton.addEventListener("click", () => {
+                activeCategoryId = category.id;
+                activeNoteId = note.id;
+                saveNotebook();
+                renderAll();
+              });
+              noteButton.addEventListener("contextmenu", (event) => {
+                event.preventDefault();
+                activeCategoryId = category.id;
+                activeNoteId = note.id;
+                menuNoteId = note.id;
+                saveNotebook();
+                renderAll();
+                showContextMenu(noteMenu, event.clientX, event.clientY);
+              });
+              noteListElement.appendChild(noteButton);
+            }
+            group.appendChild(noteListElement);
+          }
+
+          categoryList.appendChild(group);
         }
-        const notes = category.notes.filter((note) => `${note.title}\n${note.content}`.toLowerCase().includes(keyword));
-        for (const note of notes) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = `item ${note.id === activeNoteId ? "active" : ""}`;
-          button.innerHTML = `<strong>${escapeHtml(note.title || "未命名笔记")}</strong><span>${new Date(note.updatedAt).toLocaleString()}</span>`;
-          button.addEventListener("click", () => {
-            activeNoteId = note.id;
-            saveNotebook();
-            renderEditor();
-            renderNotes();
-          });
-          noteList.appendChild(button);
-        }
-        if (notes.length === 0) noteList.innerHTML = "<div class='empty'>没有匹配的笔记。</div>";
       }
 
       function renderEditor() {
@@ -716,8 +823,8 @@
       }
 
       function renderAll() {
+        renderCategoryOptions();
         renderCategories();
-        renderNotes();
         renderEditor();
         storagePathText.textContent = storagePath ? `保存位置：${storagePath}` : "本地文件服务未连接，暂存在浏览器。";
         exportButton.textContent = storagePath ? "导出 Markdown" : "导出 Markdown";
@@ -733,6 +840,17 @@
         renderAll();
       }
 
+      function renderCategoryOptions() {
+        noteCategorySelect.innerHTML = "";
+        for (const category of data.categories) {
+          const option = document.createElement("option");
+          option.value = category.id;
+          option.textContent = category.name;
+          option.selected = category.id === activeCategoryId;
+          noteCategorySelect.appendChild(option);
+        }
+      }
+
       function nextCategoryName() {
         const base = "分类";
         if (!data.categories.some((category) => category.name === base)) return base;
@@ -744,7 +862,13 @@
       function renameCategory(category = activeCategory()) {
         if (!category) return;
         hideCategoryMenu();
-        const name = window.prompt("分类名称", category.name)?.trim();
+        editingCategoryId = category.id;
+        renderCategories();
+      }
+
+      function finishRenameCategory(category, value) {
+        const name = value.trim();
+        editingCategoryId = "";
         if (!name) return;
         category.name = name;
         saveNotebook();
@@ -763,43 +887,72 @@
         renderAll();
       }
 
-      function showCategoryMenu(x, y) {
+      function showContextMenu(menu, x, y) {
         const padding = 8;
-        categoryMenu.classList.add("open");
-        const rect = categoryMenu.getBoundingClientRect();
-        categoryMenu.style.left = `${Math.min(x, window.innerWidth - rect.width - padding)}px`;
-        categoryMenu.style.top = `${Math.min(y, window.innerHeight - rect.height - padding)}px`;
+        hideMenus();
+        menu.classList.add("open");
+        const rect = menu.getBoundingClientRect();
+        menu.style.left = `${Math.min(x, window.innerWidth - rect.width - padding)}px`;
+        menu.style.top = `${Math.min(y, window.innerHeight - rect.height - padding)}px`;
       }
 
       function hideCategoryMenu() {
+        hideMenus();
+      }
+
+      function hideMenus() {
         categoryMenu.classList.remove("open");
+        noteMenu.classList.remove("open");
       }
 
       function menuCategory() {
         return categoryById(menuCategoryId) || activeCategory();
       }
 
-      function addNote() {
-        const category = activeCategory();
+      function menuNote() {
+        return noteById(menuNoteId) || activeNote();
+      }
+
+      function showAddNoteForm() {
+        renderCategoryOptions();
+        noteCreateCard.classList.add("open");
+        noteCategorySelect.value = activeCategoryId || data.categories[0]?.id || "";
+        newNoteTitleInput.value = "";
+        newNoteTitleInput.focus();
+      }
+
+      function hideAddNoteForm() {
+        noteCreateCard.classList.remove("open");
+      }
+
+      function addNote(categoryId = activeCategoryId, title = "新笔记") {
+        const category = categoryById(categoryId) || activeCategory();
         if (!category) return;
         const note = {
           id: createId("note"),
-          title: "新笔记",
+          title: title.trim() || "新笔记",
           content: "# 新笔记\n\n",
           updatedAt: new Date().toISOString(),
         };
         category.notes.unshift(note);
+        activeCategoryId = category.id;
         activeNoteId = note.id;
         saveNotebook();
         renderAll();
       }
 
-      function deleteNote() {
-        const category = activeCategory();
-        const note = activeNote();
+      function confirmAddNote() {
+        addNote(noteCategorySelect.value, newNoteTitleInput.value || "新笔记");
+        hideAddNoteForm();
+      }
+
+      function deleteNote(note = activeNote()) {
+        const category = note ? categoryForNote(note.id) : activeCategory();
         if (!category || !note) return;
+        hideMenus();
         if (!window.confirm(`确定删除笔记“${note.title || "未命名笔记"}”吗？`)) return;
         category.notes = category.notes.filter((item) => item.id !== note.id);
+        activeCategoryId = category.id;
         activeNoteId = category.notes[0]?.id;
         saveNotebook();
         renderAll();
@@ -813,7 +966,7 @@
         note.updatedAt = new Date().toISOString();
         preview.innerHTML = renderMarkdown(note.content);
         saveNotebook();
-        renderNotes();
+        renderCategories();
       }
 
       function exportMarkdown() {
@@ -843,20 +996,27 @@
       document.querySelector("#addCategoryButton").addEventListener("click", addCategory);
       document.querySelector("#renameCategoryMenuItem").addEventListener("click", () => renameCategory(menuCategory()));
       document.querySelector("#deleteCategoryMenuItem").addEventListener("click", () => deleteCategory(menuCategory()));
-      document.querySelector("#addNoteButton").addEventListener("click", addNote);
-      document.querySelector("#deleteNoteButton").addEventListener("click", deleteNote);
+      document.querySelector("#showAddNoteButton").addEventListener("click", showAddNoteForm);
+      document.querySelector("#confirmAddNoteButton").addEventListener("click", confirmAddNote);
+      document.querySelector("#cancelAddNoteButton").addEventListener("click", hideAddNoteForm);
+      document.querySelector("#deleteNoteMenuItem").addEventListener("click", () => deleteNote(menuNote()));
       document.querySelector("#exportButton").addEventListener("click", exportMarkdown);
-      noteSearchInput.addEventListener("input", renderNotes);
       noteTitleInput.addEventListener("input", updateActiveNote);
       noteContentInput.addEventListener("input", updateActiveNote);
-      document.querySelector("#categoryResizer").addEventListener("pointerdown", (event) => startPaneResize(event, "--category-width", 180, 460));
-      document.querySelector("#noteResizer").addEventListener("pointerdown", (event) => startPaneResize(event, "--note-width", 220, 560));
-      window.addEventListener("click", (event) => {
-        if (!categoryMenu.contains(event.target)) hideCategoryMenu();
+      newNoteTitleInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") confirmAddNote();
+        if (event.key === "Escape") hideAddNoteForm();
       });
-      window.addEventListener("scroll", hideCategoryMenu, true);
+      document.querySelector("#categoryResizer").addEventListener("pointerdown", (event) => startPaneResize(event, "--category-width", 220, 620));
+      window.addEventListener("click", (event) => {
+        if (!categoryMenu.contains(event.target) && !noteMenu.contains(event.target)) hideMenus();
+      });
+      window.addEventListener("scroll", hideMenus, true);
       window.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") hideCategoryMenu();
+        if (event.key === "Escape") {
+          hideMenus();
+          hideAddNoteForm();
+        }
       });
 
       restorePaneWidths();
