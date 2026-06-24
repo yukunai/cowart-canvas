@@ -1037,7 +1037,7 @@
             group.appendChild(button);
           }
 
-          if (category.id === activeCategoryId) {
+          if (category.id === activeCategoryId || searchQuery) {
             const noteListElement = document.createElement("div");
             noteListElement.className = "category-note-list";
             if (visibleNotes.length === 0) {
