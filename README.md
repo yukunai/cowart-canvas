@@ -48,6 +48,7 @@ The app runs on your own machine. Imported images, generated task files, video t
 - Read all canvas notes into a structured Codex edit prompt.
 - Send the annotated image task directly to image generation/editing APIs for fal.ai, Alibaba Wanxiang, Volcengine Ark, and Kling.
 - Choose image generation aspect ratios such as auto/source, 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, and 2:3.
+- Use the standalone Product Detail Generator page to create ecommerce product-detail images from a main product image, reference images, selling points, modules, brand tone, and image APIs.
 - Switch the full interface between Chinese and English.
 - Create image-to-video tasks from 1 to 5 reference images.
 - Configure video provider API keys in the front-end settings panel or `.env.local`.
@@ -81,6 +82,12 @@ The `?installed=1` flag is only a compatibility flag for the local browser layou
 
 ```text
 http://127.0.0.1:43219/
+```
+
+Standalone product-detail image generator:
+
+```text
+http://127.0.0.1:43219/product-detail-generator.html
 ```
 
 ## macOS Background Service

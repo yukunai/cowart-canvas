@@ -566,7 +566,10 @@
         <section class="header">
           <div class="title-row">
             <h1>图片生成 / 改图</h1>
-            <button type="button" id="backButton">回画布</button>
+            <div class="title-row">
+              <button type="button" id="productDetailButton">商品详情页</button>
+              <button type="button" id="backButton">回画布</button>
+            </div>
           </div>
           <p>上传、粘贴或拖入一张底图，选择 API 后生成。结果会直接显示在右侧，也会保存到本机任务目录。</p>
         </section>
@@ -1226,6 +1229,9 @@
 
       document.querySelector("#backButton").addEventListener("click", () => {
         window.location.href = "/?installed=1";
+      });
+      document.querySelector("#productDetailButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? "http://127.0.0.1:43219/product-detail-generator.html" : "/product-detail-generator.html";
       });
       document.querySelector("#settingsButton").addEventListener("click", () => settingsPanel.classList.toggle("visible"));
       providerSelect.addEventListener("change", () => {

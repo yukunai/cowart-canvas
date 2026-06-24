@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cowart 商品详情页生成</title>
+    <style>
+      :root {
+        color: #1f2937;
+        background: #f4f7fb;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button,
+      select,
+      input,
+      textarea {
+        border: 1px solid #cfd9e6;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #253244;
+      }
+
+      button {
+        min-height: 38px;
+        padding: 0 14px;
+        font-weight: 720;
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: #8fb3f5;
+        color: #185abc;
+      }
+
+      .primary {
+        border-color: #1f6feb;
+        background: #2672ea;
+        color: #ffffff;
+      }
+
+      .primary:hover {
+        border-color: #1d5fd3;
+        background: #1f64d6;
+        color: #ffffff;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 420px minmax(0, 1fr);
+        height: 100vh;
+        min-height: 720px;
+      }
+
+      .sidebar {
+        overflow: auto;
+        border-right: 1px solid #dce3eb;
+        background: #ffffff;
+      }
+
+      .header,
+      .section {
+        display: grid;
+        gap: 12px;
+        border-bottom: 1px solid #edf1f6;
+        padding: 18px;
+      }
+
+      .title-row,
+      .button-row,
+      .provider-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .title-row {
+        justify-content: space-between;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 18px;
+      }
+
+      h2 {
+        font-size: 14px;
+      }
+
+      p,
+      .hint {
+        color: #66758a;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        color: #26313d;
+        font-size: 13px;
+        font-weight: 720;
+      }
+
+      input,
+      select {
+        width: 100%;
+        min-height: 40px;
+        padding: 0 12px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 96px;
+        padding: 12px;
+        line-height: 1.55;
+        resize: vertical;
+      }
+
+      .provider-row label {
+        flex: 1;
+      }
+
+      .settings {
+        display: none;
+        gap: 10px;
+        border: 1px solid #dce3eb;
+        border-radius: 10px;
+        background: #f8fafc;
+        padding: 12px;
+      }
+
+      .settings.open {
+        display: grid;
+      }
+
+      .field-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .button-row button {
+        flex: 1;
+      }
+
+      .upload-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .drop-zone {
+        display: grid;
+        place-items: center;
+        min-height: 150px;
+        border: 1px dashed #aebed0;
+        border-radius: 12px;
+        background: #f8fbff;
+        color: #647587;
+        text-align: center;
+        padding: 18px;
+      }
+
+      .source-preview {
+        display: none;
+        gap: 8px;
+        border: 1px solid #dce3eb;
+        border-radius: 10px;
+        padding: 10px;
+      }
+
+      .source-preview.visible {
+        display: grid;
+      }
+
+      .source-preview img {
+        width: 100%;
+        max-height: 220px;
+        border-radius: 8px;
+        background: #111827;
+        object-fit: contain;
+      }
+
+      .reference-list {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .reference-card {
+        position: relative;
+        display: grid;
+        place-items: center;
+        min-height: 72px;
+        overflow: hidden;
+        border: 1px dashed #b8c6d5;
+        border-radius: 9px;
+        background: #f8fbff;
+        color: #647587;
+        font-size: 12px;
+        text-align: center;
+      }
+
+      .reference-card.filled {
+        border-style: solid;
+        background: #101820;
+      }
+
+      .reference-card img {
+        width: 100%;
+        height: 86px;
+        object-fit: cover;
+      }
+
+      .reference-card button {
+        position: absolute;
+        right: 5px;
+        top: 5px;
+        min-width: 22px;
+        min-height: 22px;
+        height: 22px;
+        border-color: rgba(248, 113, 113, 0.42);
+        background: rgba(255, 255, 255, 0.86);
+        color: #b42318;
+        padding: 0;
+      }
+
+      .message {
+        white-space: pre-wrap;
+        border: 1px solid #dce3eb;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: #314050;
+        font-size: 12px;
+        line-height: 1.55;
+        min-height: 46px;
+        padding: 10px;
+      }
+
+      .main {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid #dce3eb;
+        background: #ffffff;
+        padding: 14px 18px;
+      }
+
+      .workspace {
+        overflow: auto;
+        padding: 24px;
+      }
+
+      .result-wrap {
+        display: grid;
+        gap: 16px;
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+
+      .empty,
+      .result-card,
+      .history {
+        border: 1px solid #dce3eb;
+        border-radius: 12px;
+        background: #ffffff;
+      }
+
+      .empty {
+        display: grid;
+        place-items: center;
+        min-height: 460px;
+        color: #647587;
+        text-align: center;
+        padding: 32px;
+      }
+
+      .result-card {
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+      }
+
+      .result-card img {
+        width: 100%;
+        max-height: 78vh;
+        border-radius: 10px;
+        background: #101820;
+        object-fit: contain;
+      }
+
+      .result-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .result-actions a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 38px;
+        border: 1px solid #cfd9e6;
+        border-radius: 8px;
+        color: #1f5fbf;
+        font-size: 14px;
+        font-weight: 720;
+        padding: 0 14px;
+        text-decoration: none;
+      }
+
+      .history {
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+      }
+
+      .history-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap: 10px;
+      }
+
+      .thumb {
+        display: grid;
+        gap: 7px;
+        border: 1px solid #d8e0e8;
+        border-radius: 9px;
+        background: #ffffff;
+        cursor: pointer;
+        padding: 8px;
+      }
+
+      .thumb img {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        border-radius: 6px;
+        background: #101820;
+        object-fit: cover;
+      }
+
+      .thumb span {
+        overflow: hidden;
+        font-size: 12px;
+        font-weight: 720;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 980px) {
+        .app {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+
+        .sidebar {
+          border-right: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <aside class="sidebar">
+        <section class="header">
+          <div class="title-row">
+            <h1>商品详情页生成</h1>
+            <button type="button" id="imagePageButton">通用生图</button>
+          </div>
+          <p>专门给电商商品图生成详情页长图：上传主产品图和参考图，填写卖点、风格和模块结构。</p>
+        </section>
+
+        <section class="section">
+          <h2>平台与模板</h2>
+          <div class="provider-row">
+            <label>
+              生图模型 / 平台
+              <select id="providerSelect"></select>
+            </label>
+            <button type="button" id="settingsButton">API 设置</button>
+          </div>
+          <div class="settings" id="settingsPanel">
+            <div class="title-row">
+              <h2 id="settingsTitle">API 设置</h2>
+              <button type="button" id="refreshConfigButton">刷新</button>
+            </div>
+            <div class="field-grid" id="settingsFields"></div>
+            <button type="button" class="primary" id="saveConfigButton">保存 API 设置</button>
+          </div>
+          <label>
+            详情页类型
+            <select id="templateSelect">
+              <option value="premium">高级品牌详情页</option>
+              <option value="commerce">电商转化详情页</option>
+              <option value="minimal">极简质感详情页</option>
+              <option value="tech">科技参数详情页</option>
+              <option value="beauty">美妆护肤详情页</option>
+            </select>
+          </label>
+          <label>
+            生成比例
+            <select id="aspectRatioSelect">
+              <option value="9:16">详情长图 9:16</option>
+              <option value="3:4">竖版 3:4</option>
+              <option value="2:3">竖版 2:3</option>
+              <option value="1:1">方图 1:1</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="section">
+          <h2>商品信息</h2>
+          <label>
+            商品名称
+            <input id="productNameInput" placeholder="比如：真丝围巾 / 便携咖啡机 / 护肤精华" />
+          </label>
+          <label>
+            品牌调性
+            <input id="brandToneInput" placeholder="比如：高级、干净、轻奢、自然、科技感" />
+          </label>
+          <label>
+            核心卖点
+            <textarea id="sellingPointsInput" placeholder="每行一个卖点，比如：&#10;桑蚕丝材质&#10;柔软亲肤&#10;适合通勤和礼赠"></textarea>
+          </label>
+          <label>
+            详情页模块
+            <textarea id="modulesInput" placeholder="比如：首屏主视觉、材质细节、使用场景、尺寸参数、礼盒包装、购买理由"></textarea>
+          </label>
+          <label>
+            反向提示词（可选）
+            <textarea id="negativePromptInput" placeholder="比如：不要低清、不要廉价感、不要文字乱码、不要夸张促销风、不要机械拼贴"></textarea>
+          </label>
+          <button type="button" class="primary" id="generateButton">生成商品详情页</button>
+          <pre class="message" id="message">准备就绪。</pre>
+        </section>
+
+        <section class="section">
+          <h2>主产品图</h2>
+          <div class="upload-grid">
+            <button type="button" id="uploadButton">上传产品图</button>
+            <button type="button" id="pasteButton">粘贴产品图</button>
+          </div>
+          <input id="fileInput" type="file" accept="image/*" hidden />
+          <div class="drop-zone" id="dropZone">把主产品图拖到这里</div>
+          <div class="source-preview" id="sourcePreview">
+            <img id="sourceImage" alt="product" />
+            <p id="sourceName"></p>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2>参考图</h2>
+          <p>最多 5 张，可作为品牌风格、场景、材质细节、包装或其它产品参考。</p>
+          <div class="upload-grid">
+            <button type="button" id="referenceUploadButton">上传参考图</button>
+            <button type="button" id="referencePasteButton">粘贴参考图</button>
+          </div>
+          <input id="referenceInput" type="file" accept="image/*" multiple hidden />
+          <div class="reference-list" id="referenceList"></div>
+          <button type="button" id="clearReferencesButton">清空参考图</button>
+        </section>
+      </aside>
+
+      <section class="main">
+        <header class="topbar">
+          <strong id="topStatus">生成结果会展示在这里</strong>
+          <button type="button" id="refreshHistoryButton">刷新历史</button>
+        </header>
+        <div class="workspace">
+          <section class="result-wrap">
+            <div id="heroResult" class="empty">还没有详情页。上传商品图并点击生成后，会直接展示在这里。</div>
+            <section class="history">
+              <div class="title-row">
+                <h2>历史商品详情图</h2>
+                <p id="historyCount">0 张</p>
+              </div>
+              <div class="history-grid" id="historyGrid"></div>
+            </section>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const apiBase = location.protocol === "file:" ? "http://127.0.0.1:43219" : "";
+      const providers = [
+        { id: "wanxiang", name: "阿里万象" },
+        { id: "volcengine", name: "火山" },
+        { id: "kling", name: "可灵" },
+        { id: "fal", name: "fal.ai" },
+        { id: "openai", name: "OpenAI" },
+        { id: "my", name: "Midjourney" },
+        { id: "flux", name: "Flux" },
+        { id: "sd", name: "Stable Diffusion (SD)" },
+      ];
+      const templatePrompts = {
+        premium:
+          "高级品牌详情页。画面像高端品牌官网或精品电商长图，留白克制，排版精致，产品质感强，光影统一，文字区域清晰但不要堆砌。",
+        commerce:
+          "电商转化详情页。结构清楚，突出主图、卖点、细节、使用场景和购买理由，视觉干净可信，不要廉价促销风。",
+        minimal:
+          "极简质感详情页。大面积留白、清晰层级、柔和自然光、少量关键文字，整体高级、安静、耐看。",
+        tech:
+          "科技参数详情页。适合电子产品、器具和功能型商品，包含产品爆炸感细节、参数模块、功能图标感区域和理性信息层级。",
+        beauty:
+          "美妆护肤详情页。适合护肤、美妆、香氛，强调质地、成分、使用感、自然光、柔和高级色彩和干净排版。",
+      };
+
+      let currentProvider = localStorage.getItem("cowart-product-detail-provider") || "fal";
+      let currentImage = null;
+      let referenceImages = [];
+      let configProviders = [];
+      let configValues = {};
+
+      const providerSelect = document.querySelector("#providerSelect");
+      const settingsPanel = document.querySelector("#settingsPanel");
+      const settingsTitle = document.querySelector("#settingsTitle");
+      const settingsFields = document.querySelector("#settingsFields");
+      const productNameInput = document.querySelector("#productNameInput");
+      const brandToneInput = document.querySelector("#brandToneInput");
+      const sellingPointsInput = document.querySelector("#sellingPointsInput");
+      const modulesInput = document.querySelector("#modulesInput");
+      const negativePromptInput = document.querySelector("#negativePromptInput");
+      const templateSelect = document.querySelector("#templateSelect");
+      const aspectRatioSelect = document.querySelector("#aspectRatioSelect");
+      const message = document.querySelector("#message");
+      const sourcePreview = document.querySelector("#sourcePreview");
+      const sourceImage = document.querySelector("#sourceImage");
+      const sourceName = document.querySelector("#sourceName");
+      const referenceList = document.querySelector("#referenceList");
+      const heroResult = document.querySelector("#heroResult");
+      const historyGrid = document.querySelector("#historyGrid");
+      const historyCount = document.querySelector("#historyCount");
+      const topStatus = document.querySelector("#topStatus");
+
+      function setMessage(text) {
+        message.textContent = text;
+        topStatus.textContent = text.split("\n")[0] || "生成结果会展示在这里";
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function resolveUrl(url) {
+        if (!url || /^https?:|^data:|^blob:/i.test(url)) return url;
+        return `${apiBase}${url}`;
+      }
+
+      function renderProviders() {
+        providerSelect.innerHTML = "";
+        for (const provider of providers) {
+          const option = document.createElement("option");
+          option.value = provider.id;
+          option.textContent = provider.name;
+          providerSelect.appendChild(option);
+        }
+        providerSelect.value = currentProvider;
+      }
+
+      async function loadConfig() {
+        const response = await fetch(`${apiBase}/api/image-config`, { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || "读取 API 设置失败");
+        configProviders = data.providers || [];
+        for (const provider of configProviders) {
+          for (const field of provider.fields) {
+            configValues[field.key] = field.secret ? configValues[field.key] || "" : field.value || "";
+          }
+        }
+        renderSettings();
+      }
+
+      function renderSettings() {
+        const provider = configProviders.find((item) => item.id === currentProvider);
+        settingsTitle.textContent = `${provider?.name || currentProvider} API 设置`;
+        settingsFields.innerHTML = "";
+        if (!provider) {
+          settingsFields.innerHTML = "<p class='hint'>还没有读到这个平台的设置项。</p>";
+          return;
+        }
+        for (const field of provider.fields) {
+          const label = document.createElement("label");
+          const title = document.createElement("span");
+          title.textContent = field.configured && field.secret ? `${field.label}（已保存）` : field.label;
+          const input = document.createElement("input");
+          input.type = field.secret ? "password" : "text";
+          input.value = configValues[field.key] || "";
+          input.placeholder = field.secret && field.configured ? "已保存，留空不修改" : field.placeholder || field.key;
+          input.autocomplete = "off";
+          input.addEventListener("input", () => {
+            configValues[field.key] = input.value;
+          });
+          label.append(title, input);
+          settingsFields.appendChild(label);
+        }
+      }
+
+      async function saveConfig() {
+        const provider = configProviders.find((item) => item.id === currentProvider);
+        if (!provider) return;
+        const values = Object.fromEntries(provider.fields.map((field) => [field.key, configValues[field.key] || ""]));
+        setMessage("正在保存 API 设置...");
+        const response = await fetch(`${apiBase}/api/image-config`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: currentProvider, values }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || "保存 API 设置失败");
+        configProviders = data.providers || [];
+        renderSettings();
+        setMessage("API 设置已保存。");
+      }
+
+      function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function setSourceFile(file) {
+        if (!file?.type?.startsWith("image/")) return;
+        const imageDataUrl = await readFileAsDataUrl(file);
+        currentImage = {
+          title: file.name || `product-${Date.now()}.png`,
+          source: "uploaded",
+          imageDataUrl,
+        };
+        sourceImage.src = imageDataUrl;
+        sourceName.textContent = currentImage.title;
+        sourcePreview.classList.add("visible");
+        setMessage("已导入主产品图。");
+      }
+
+      async function addReferenceFiles(files) {
+        const usable = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
+        for (const file of usable) {
+          if (referenceImages.length >= 5) break;
+          referenceImages.push({
+            title: file.name || `reference-${Date.now()}.png`,
+            imageDataUrl: await readFileAsDataUrl(file),
+          });
+        }
+        renderReferences();
+        setMessage(`已加入 ${referenceImages.length}/5 张参考图。`);
+      }
+
+      function renderReferences() {
+        referenceList.innerHTML = "";
+        for (let index = 0; index < 5; index += 1) {
+          const reference = referenceImages[index];
+          const card = document.createElement("div");
+          card.className = `reference-card ${reference ? "filled" : ""}`;
+          if (reference) {
+            card.innerHTML = `<img src="${reference.imageDataUrl}" alt=""><button type="button" title="移除">×</button>`;
+            card.querySelector("button").addEventListener("click", () => {
+              referenceImages.splice(index, 1);
+              renderReferences();
+            });
+          } else {
+            card.textContent = index === referenceImages.length ? "添加参考图" : "空位";
+            if (index === referenceImages.length) card.addEventListener("click", () => document.querySelector("#referenceInput").click());
+          }
+          referenceList.appendChild(card);
+        }
+      }
+
+      async function pasteImage(target = "source") {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const type = item.types.find((itemType) => itemType.startsWith("image/"));
+          if (!type) continue;
+          const blob = await item.getType(type);
+          const file = new File([blob], `${target}-${Date.now()}.png`, { type });
+          if (target === "reference") await addReferenceFiles([file]);
+          else await setSourceFile(file);
+          return;
+        }
+        setMessage("剪贴板里没有图片。");
+      }
+
+      function buildPrompt() {
+        const productName = productNameInput.value.trim() || "未命名商品";
+        const brandTone = brandToneInput.value.trim() || "高级、干净、可信";
+        const sellingPoints = sellingPointsInput.value.trim() || "突出商品质感、核心卖点、细节和使用场景";
+        const modules = modulesInput.value.trim() || "首屏主视觉、核心卖点、材质细节、使用场景、尺寸/参数、购买理由";
+        const template = templatePrompts[templateSelect.value] || templatePrompts.premium;
+        return [
+          "请生成一张专门用于电商/品牌展示的商品详情页图片，不是普通单张商品海报。",
+          template,
+          `商品名称：${productName}`,
+          `品牌调性：${brandTone}`,
+          `核心卖点：\n${sellingPoints}`,
+          `详情页模块：\n${modules}`,
+          `页面比例：${aspectRatioSelect.value}`,
+          referenceImages.length ? `参考图数量：${referenceImages.length}。参考图可以作为材质、包装、场景、配色、局部产品或风格参考自然融合。` : "",
+          "版式要求：长图结构清晰，有首屏主视觉、分区模块、细节展示和信息层级；产品不能变形；光线、透视、阴影、材质统一；不要机械拼贴。",
+          "文字要求：文字区域要清爽、少而准；不要生成乱码、密密麻麻的小字或错误参数。如果模型不擅长文字，优先用干净标题块和可读的大字号短句。",
+        ]
+          .filter(Boolean)
+          .join("\n");
+      }
+
+      async function generateProductDetail() {
+        if (!currentImage) {
+          setMessage("先上传、粘贴或拖入一张主产品图。");
+          return;
+        }
+        const negativePrompt = negativePromptInput.value.trim();
+        const editPrompt = [buildPrompt(), negativePrompt ? `反向提示词：${negativePrompt}` : ""].filter(Boolean).join("\n\n");
+        const providerName = providers.find((item) => item.id === currentProvider)?.name || currentProvider;
+        setMessage(`正在提交到 ${providerName} 生成商品详情页...`);
+        const response = await fetch(`${apiBase}/api/image-generation`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: currentProvider,
+            image: { title: currentImage.title, source: currentImage.source },
+            references: referenceImages.map((reference, index) => ({
+              label: `详情页参考图 ${index + 1}`,
+              image: { title: reference.title, source: "uploaded" },
+            })),
+            annotations: [{ kind: "text", x: 50, y: 50, text: editPrompt }],
+            editPrompt,
+            negativePrompt,
+            aspectRatio: aspectRatioSelect.value,
+            imageDataUrl: currentImage.imageDataUrl,
+            referenceImageDataUrls: referenceImages.map((reference) => reference.imageDataUrl),
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || "生成失败");
+        if (data.status === "needs_config") {
+          setMessage(`还没提交到 ${providerName}：缺少 ${(data.missingEnv || []).join("、")}\n请点 API 设置补齐。`);
+          return;
+        }
+        if (data.resultImageUrl && data.resultImagePath) {
+          showResult({
+            name: data.resultImagePath.split("/").slice(-2).join("/"),
+            path: data.resultImagePath,
+            url: resolveUrl(data.resultImageUrl),
+          });
+          setMessage(`生成成功：${data.resultImagePath}`);
+          await loadHistory();
+          return;
+        }
+        setMessage(`已提交到 ${providerName}，但平台暂时没有直接返回图片。\n任务目录：${data.directory || ""}\n任务 ID：${data.providerTaskId || ""}`);
+        await loadHistory();
+      }
+
+      function showResult(image) {
+        heroResult.className = "result-card";
+        heroResult.innerHTML = `
+          <img src="${image.url}" alt="">
+          <div class="hint"><strong>${escapeHtml(image.name)}</strong><br>${escapeHtml(image.path)}</div>
+          <div class="result-actions">
+            <a href="${image.url}" target="_blank" rel="noreferrer">打开图片</a>
+            <a href="${image.url}" download="${escapeHtml(image.name || "product-detail.png")}">下载图片</a>
+          </div>
+        `;
+      }
+
+      async function loadHistory() {
+        const response = await fetch(`${apiBase}/api/recent-images`, { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "读取历史结果失败");
+        const images = (data.images || []).filter((image) => /result|output|wanxiang|kling|volcengine|fal|openai|my|flux|sd/i.test(`${image.name} ${image.path}`));
+        historyCount.textContent = `${images.length} 张`;
+        historyGrid.innerHTML = "";
+        for (const image of images.slice(0, 30)) {
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = "thumb";
+          card.title = image.path;
+          card.innerHTML = `<img src="${resolveUrl(image.url)}" alt=""><span>${escapeHtml(image.name)}</span>`;
+          card.addEventListener("click", () => showResult({ ...image, url: resolveUrl(image.url) }));
+          historyGrid.appendChild(card);
+        }
+      }
+
+      providerSelect.addEventListener("change", () => {
+        currentProvider = providerSelect.value;
+        localStorage.setItem("cowart-product-detail-provider", currentProvider);
+        renderSettings();
+      });
+      document.querySelector("#settingsButton").addEventListener("click", () => settingsPanel.classList.toggle("open"));
+      document.querySelector("#refreshConfigButton").addEventListener("click", () => loadConfig().catch((error) => setMessage(error.message)));
+      document.querySelector("#saveConfigButton").addEventListener("click", () => saveConfig().catch((error) => setMessage(error.message)));
+      document.querySelector("#uploadButton").addEventListener("click", () => document.querySelector("#fileInput").click());
+      document.querySelector("#referenceUploadButton").addEventListener("click", () => document.querySelector("#referenceInput").click());
+      document.querySelector("#fileInput").addEventListener("change", (event) => setSourceFile(event.target.files?.[0]).catch((error) => setMessage(error.message)));
+      document.querySelector("#referenceInput").addEventListener("change", (event) => addReferenceFiles(event.target.files).catch((error) => setMessage(error.message)));
+      document.querySelector("#pasteButton").addEventListener("click", () => pasteImage("source").catch((error) => setMessage(error.message)));
+      document.querySelector("#referencePasteButton").addEventListener("click", () => pasteImage("reference").catch((error) => setMessage(error.message)));
+      document.querySelector("#clearReferencesButton").addEventListener("click", () => {
+        referenceImages = [];
+        renderReferences();
+        setMessage("已清空参考图。");
+      });
+      document.querySelector("#generateButton").addEventListener("click", () => generateProductDetail().catch((error) => setMessage(error.message)));
+      document.querySelector("#refreshHistoryButton").addEventListener("click", () => loadHistory().catch((error) => setMessage(error.message)));
+      document.querySelector("#imagePageButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/image-generator.html` : "/image-generator.html";
+      });
+
+      const dropZone = document.querySelector("#dropZone");
+      dropZone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+      });
+      dropZone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        setSourceFile(event.dataTransfer.files?.[0]).catch((error) => setMessage(error.message));
+      });
+      referenceList.addEventListener("dragover", (event) => event.preventDefault());
+      referenceList.addEventListener("drop", (event) => {
+        event.preventDefault();
+        addReferenceFiles(event.dataTransfer.files).catch((error) => setMessage(error.message));
+      });
+
+      renderProviders();
+      renderReferences();
+      loadConfig().catch((error) => setMessage(error.message));
+      loadHistory().catch((error) => setMessage(error.message));
+    </script>
+  </body>
+</html>
