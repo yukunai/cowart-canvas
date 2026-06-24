@@ -321,11 +321,18 @@
 
       .topbar {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) auto auto auto auto;
         gap: 10px;
         border-bottom: 1px solid #dce3eb;
         background: #ffffff;
         padding: 14px 18px;
+      }
+
+      .editor-action {
+        min-height: 34px;
+        font-size: 12px;
+        font-weight: 680;
+        padding: 0 10px;
       }
 
       .title-input {
@@ -392,9 +399,33 @@
       .preview p,
       .preview ul,
       .preview ol,
-      .preview pre,
+      .code-block,
       .preview blockquote {
         margin: 0 0 12px;
+      }
+
+      .code-block {
+        position: relative;
+      }
+
+      .copy-code-button {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        min-height: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 5px;
+        background: rgba(15, 23, 42, 0.78);
+        color: #e5e7eb;
+        font-size: 9px;
+        font-weight: 620;
+        padding: 0 6px;
+      }
+
+      .copy-code-button:hover {
+        border-color: rgba(255, 255, 255, 0.36);
+        background: rgba(30, 41, 59, 0.92);
+        color: #ffffff;
       }
 
       .preview code {
@@ -409,7 +440,10 @@
         border-radius: 8px;
         background: #111827;
         color: #f8fafc;
-        padding: 12px;
+        max-height: 280px;
+        font-size: 11px;
+        line-height: 1.36;
+        padding: 26px 10px 10px;
       }
 
       .preview pre code {
@@ -487,7 +521,10 @@
       <section class="editor">
         <header class="topbar">
           <input class="title-input" id="noteTitleInput" placeholder="笔记标题" />
-          <button type="button" id="exportButton">导出 Markdown</button>
+          <button type="button" class="editor-action" id="headingOneButton">H1</button>
+          <button type="button" class="editor-action" id="headingTwoButton">H2</button>
+          <button type="button" class="editor-action" id="insertCodeBlockButton">代码块</button>
+          <button type="button" class="editor-action" id="exportButton">导出 Markdown</button>
         </header>
         <div class="editor-body">
           <textarea class="markdown-editor" id="noteContentInput" placeholder="在这里写 Markdown..."></textarea>
@@ -521,6 +558,9 @@
       const noteTitleInput = document.querySelector("#noteTitleInput");
       const noteContentInput = document.querySelector("#noteContentInput");
       const preview = document.querySelector("#preview");
+      const headingOneButton = document.querySelector("#headingOneButton");
+      const headingTwoButton = document.querySelector("#headingTwoButton");
+      const insertCodeBlockButton = document.querySelector("#insertCodeBlockButton");
       const exportButton = document.querySelector("#exportButton");
       const storagePathText = document.querySelector("#storagePathText");
       const categoryMenu = document.querySelector("#categoryMenu");
@@ -706,7 +746,7 @@
               html.push("</ul>");
               listOpen = false;
             }
-            html.push(inCode ? "</code></pre>" : "<pre><code>");
+            html.push(inCode ? "</code></pre></div>" : '<div class="code-block"><button type="button" class="copy-code-button">复制</button><pre><code>');
             inCode = !inCode;
             continue;
           }
@@ -734,7 +774,7 @@
           else html.push(`<p>${inlineMarkdown(line)}</p>`);
         }
         if (listOpen) html.push("</ul>");
-        if (inCode) html.push("</code></pre>");
+        if (inCode) html.push("</code></pre></div>");
         return html.join("\n");
       }
 
@@ -831,6 +871,9 @@
         const disabled = !note;
         noteTitleInput.disabled = disabled;
         noteContentInput.disabled = disabled;
+        headingOneButton.disabled = disabled;
+        headingTwoButton.disabled = disabled;
+        insertCodeBlockButton.disabled = disabled;
         exportButton.disabled = disabled;
         if (!note) {
           noteTitleInput.value = "";
@@ -992,6 +1035,67 @@
         renderCategories();
       }
 
+      function insertCodeBlock() {
+        const note = activeNote();
+        if (!note) return;
+        const start = noteContentInput.selectionStart ?? noteContentInput.value.length;
+        const end = noteContentInput.selectionEnd ?? start;
+        const before = noteContentInput.value.slice(0, start);
+        const selected = noteContentInput.value.slice(start, end);
+        const after = noteContentInput.value.slice(end);
+        const prefix = before && !before.endsWith("\n") ? "\n\n" : "";
+        const suffix = after && !after.startsWith("\n") ? "\n\n" : "";
+        const code = selected || "// code";
+        const block = `${prefix}\`\`\`javascript\n${code}\n\`\`\`${suffix}`;
+        noteContentInput.value = `${before}${block}${after}`;
+        const cursor = selected ? start + block.length : start + prefix.length + "```javascript\n".length;
+        noteContentInput.focus();
+        noteContentInput.setSelectionRange(cursor, selected ? cursor : cursor + code.length);
+        updateActiveNote();
+      }
+
+      function insertHeading(level) {
+        const note = activeNote();
+        if (!note) return;
+        const marker = `${"#".repeat(level)} `;
+        const value = noteContentInput.value;
+        const start = noteContentInput.selectionStart ?? 0;
+        const end = noteContentInput.selectionEnd ?? start;
+        const lineStart = value.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+        const lineEndIndex = value.indexOf("\n", end);
+        const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+        const original = value.slice(lineStart, lineEnd);
+        const clean = original.replace(/^#{1,6}\s+/, "");
+        const nextLine = `${marker}${clean || "标题"}`;
+        noteContentInput.value = `${value.slice(0, lineStart)}${nextLine}${value.slice(lineEnd)}`;
+        const cursor = lineStart + nextLine.length;
+        noteContentInput.focus();
+        noteContentInput.setSelectionRange(cursor, cursor);
+        updateActiveNote();
+      }
+
+      async function copyCodeBlock(button) {
+        const code = button.closest(".code-block")?.querySelector("code")?.textContent || "";
+        if (!code) return;
+        try {
+          await navigator.clipboard.writeText(code);
+        } catch {
+          const textarea = document.createElement("textarea");
+          textarea.value = code;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          textarea.remove();
+        }
+        const originalText = button.textContent;
+        button.textContent = "已复制";
+        window.setTimeout(() => {
+          button.textContent = originalText || "复制";
+        }, 1200);
+      }
+
       function exportMarkdown() {
         const note = activeNote();
         if (!note) return;
@@ -1023,7 +1127,14 @@
       document.querySelector("#confirmAddNoteButton").addEventListener("click", confirmAddNote);
       document.querySelector("#cancelAddNoteButton").addEventListener("click", hideAddNoteForm);
       document.querySelector("#deleteNoteMenuItem").addEventListener("click", () => deleteNote(menuNote()));
+      headingOneButton.addEventListener("click", () => insertHeading(1));
+      headingTwoButton.addEventListener("click", () => insertHeading(2));
+      insertCodeBlockButton.addEventListener("click", insertCodeBlock);
       document.querySelector("#exportButton").addEventListener("click", exportMarkdown);
+      preview.addEventListener("click", (event) => {
+        const button = event.target.closest(".copy-code-button");
+        if (button) copyCodeBlock(button);
+      });
       noteTitleInput.addEventListener("input", updateActiveNote);
       noteContentInput.addEventListener("input", updateActiveNote);
       newNoteTitleInput.addEventListener("keydown", (event) => {
