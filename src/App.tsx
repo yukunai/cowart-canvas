@@ -86,7 +86,6 @@ type CodexTaskResponse = {
 }
 
 type VideoProvider = 'kling' | 'volcengine' | 'wanxiang' | 'runway' | 'luma' | 'fal' | 'replicate'
-type ImageProvider = 'fal' | 'wanxiang' | 'volcengine' | 'kling'
 
 type VideoTaskResponse = {
   status?: 'needs_config' | 'submitted'
@@ -102,29 +101,11 @@ type VideoTaskResponse = {
   error?: string
 }
 
-type ImageTaskResponse = {
-  status?: 'needs_config' | 'submitted' | 'provider_error' | 'ready'
-  provider?: ImageProvider
-  providerName?: string
-  missingEnv?: string[]
-  directory?: string
-  imagePath?: string
-  requestPath?: string
-  promptPath?: string
-  providerRequestPath?: string
-  providerResponsePath?: string
-  providerTaskId?: string
-  resultImagePath?: string
-  resultImageUrl?: string
-  error?: string
-}
-
 const maxVideoImages = 5
 const maxCanvasReferenceImages = 3
 const defaultReferenceSlotSize = 64
 const minReferenceSlotSize = 52
 const maxReferenceSlotSize = 110
-const imageAspectRatioOptions = ['adaptive', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3']
 const imageGenerationSkills = [
   {
     id: 'strict-local-edit',
@@ -225,17 +206,6 @@ type VideoConfigProvider = {
 
 type VideoConfigResponse = {
   providers?: VideoConfigProvider[]
-  error?: string
-}
-
-type ImageConfigProvider = {
-  id: ImageProvider
-  name: string
-  fields: VideoConfigField[]
-}
-
-type ImageConfigResponse = {
-  providers?: ImageConfigProvider[]
   error?: string
 }
 
@@ -387,13 +357,6 @@ const videoProviders: Array<{ id: VideoProvider; labelZh: string; labelEn: strin
   { id: 'replicate', labelZh: 'Replicate', labelEn: 'Replicate', noteZh: '自选模型版本', noteEn: 'Custom model version' },
 ]
 
-const imageProviders: Array<{ id: ImageProvider; labelZh: string; labelEn: string; noteZh: string; noteEn: string }> = [
-  { id: 'fal', labelZh: 'fal.ai', labelEn: 'fal.ai', noteZh: 'Kontext 等改图模型', noteEn: 'Kontext image editing' },
-  { id: 'wanxiang', labelZh: '阿里万象', labelEn: 'Wanxiang', noteZh: 'DashScope 图像模型', noteEn: 'DashScope image models' },
-  { id: 'volcengine', labelZh: '火山', labelEn: 'Volcano', noteZh: '方舟图像模型', noteEn: 'Ark image models' },
-  { id: 'kling', labelZh: '可灵', labelEn: 'Kling', noteZh: '可配置图片接口', noteEn: 'Configurable image endpoint' },
-]
-
 const videoDurationOptions = Array.from({ length: 12 }, (_, index) => String(index + 4))
 const minCanvasScale = 0.25
 const maxCanvasScale = 5
@@ -428,12 +391,6 @@ const videoProviderNameFallbacks: Array<{ pattern: RegExp; provider: VideoProvid
 function getVideoProviderText(provider: VideoProvider | undefined, language: Language, fallback?: string) {
   const matchedProvider = provider ?? videoProviderNameFallbacks.find((item) => fallback && item.pattern.test(fallback))?.provider
   const info = videoProviders.find((item) => item.id === matchedProvider)
-  if (info) return language === 'en' ? info.labelEn : info.labelZh
-  return fallback
-}
-
-function getImageProviderText(provider: ImageProvider | undefined, language: Language, fallback?: string) {
-  const info = imageProviders.find((item) => item.id === provider)
   if (info) return language === 'en' ? info.labelEn : info.labelZh
   return fallback
 }
@@ -831,16 +788,6 @@ function App() {
   const [videoConfigProviders, setVideoConfigProviders] = useState<VideoConfigProvider[]>([])
   const [videoConfigValues, setVideoConfigValues] = useState<Record<string, string>>({})
   const [videoConfigMessage, setVideoConfigMessage] = useState('')
-  const [imageProvider, setImageProvider] = useState<ImageProvider>('fal')
-  const [imageAspectRatio, setImageAspectRatio] = useState('adaptive')
-  const [isImageApiSettingsOpen, setIsImageApiSettingsOpen] = useState(false)
-  const [isImageApiConfigLoading, setIsImageApiConfigLoading] = useState(false)
-  const [isImageApiConfigSaving, setIsImageApiConfigSaving] = useState(false)
-  const [imageConfigProviders, setImageConfigProviders] = useState<ImageConfigProvider[]>([])
-  const [imageConfigValues, setImageConfigValues] = useState<Record<string, string>>({})
-  const [imageConfigMessage, setImageConfigMessage] = useState('')
-  const [isImageApiSubmitting, setIsImageApiSubmitting] = useState(false)
-  const [imageApiMessage, setImageApiMessage] = useState('')
 
   useEffect(() => {
     window.localStorage.setItem('cowart-canvas-language', language)
@@ -869,8 +816,6 @@ function App() {
   }, [activeImage, isVideoPanelOpen, language, status, tr])
   const displayVideoTaskMessage = useMemo(() => videoTaskMessage.split('\n').map((line) => localizeKnownMessage(line, language)).join('\n'), [language, videoTaskMessage])
   const displayVideoConfigMessage = useMemo(() => localizeKnownMessage(videoConfigMessage, language), [language, videoConfigMessage])
-  const displayImageConfigMessage = useMemo(() => localizeKnownMessage(imageConfigMessage, language), [language, imageConfigMessage])
-  const displayImageApiMessage = useMemo(() => imageApiMessage.split('\n').map((line) => localizeKnownMessage(line, language)).join('\n'), [imageApiMessage, language])
 
   const filledCanvasReferences = useMemo(
     () =>
@@ -889,7 +834,6 @@ function App() {
   const annotations = useMemo(() => (activeImageKey ? (annotationMap[activeImageKey] ?? []) : []), [activeImageKey, annotationMap])
   const canvasZoomLabel = `${Math.round(canvasScale * 100)}%`
   const selectedVideoConfig = videoConfigProviders.find((provider) => provider.id === videoProvider)
-  const selectedImageConfig = imageConfigProviders.find((provider) => provider.id === imageProvider)
   const imageCanvasStyle = activeDimensions
     ? ({
         width: `${Math.max(1, Math.round(activeDimensions.width * canvasScale))}px`,
@@ -1487,73 +1431,6 @@ function App() {
     }
   }
 
-  const applyImageConfigResponse = (data: ImageConfigResponse) => {
-    const providers = data.providers ?? []
-    setImageConfigProviders(providers)
-    setImageConfigValues((current) => {
-      const next = { ...current }
-      for (const provider of providers) {
-        for (const field of provider.fields) {
-          if (field.secret) {
-            next[field.key] ??= ''
-          } else {
-            next[field.key] = field.value ?? ''
-          }
-        }
-      }
-      return next
-    })
-  }
-
-  const loadImageConfig = async () => {
-    setIsImageApiConfigLoading(true)
-    setImageConfigMessage('')
-    try {
-      const response = await fetch('/api/image-config', { cache: 'no-store' })
-      const data = (await response.json()) as ImageConfigResponse
-      if (!response.ok || data.error) throw new Error(data.error || '读取图片 API 设置失败')
-      applyImageConfigResponse(data)
-    } catch (error) {
-      setImageConfigMessage(error instanceof Error ? localizeKnownMessage(error.message, language) : tr('读取图片 API 设置失败', 'Could not read image API settings'))
-    } finally {
-      setIsImageApiConfigLoading(false)
-    }
-  }
-
-  const openImageApiSettings = () => {
-    setIsImageApiSettingsOpen((isOpen) => !isOpen)
-    if (!isImageApiSettingsOpen && imageConfigProviders.length === 0) void loadImageConfig()
-  }
-
-  const saveImageApiSettings = async () => {
-    const provider = selectedImageConfig
-    if (!provider) {
-      setImageConfigMessage(tr('还没有读到这个图片平台的设置项', 'No settings were found for this image provider yet'))
-      return
-    }
-
-    const values = Object.fromEntries(provider.fields.map((field) => [field.key, imageConfigValues[field.key] ?? '']))
-    setIsImageApiConfigSaving(true)
-    setImageConfigMessage('')
-    try {
-      const response = await fetch('/api/image-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: provider.id, values }),
-      })
-      const data = (await response.json()) as ImageConfigResponse
-      if (!response.ok || data.error) throw new Error(data.error || '保存图片 API 设置失败')
-      applyImageConfigResponse(data)
-      const providerName = getImageProviderText(provider.id, language, provider.name)
-      setImageConfigMessage(tr(`${providerName} 图片 API 设置已保存`, `${providerName} image API settings saved`))
-      setStatus(tr(`${providerName} 图片 API 设置已保存，可以继续改图`, `${providerName} image API settings saved. You can edit images now.`))
-    } catch (error) {
-      setImageConfigMessage(error instanceof Error ? localizeKnownMessage(error.message, language) : tr('保存图片 API 设置失败', 'Could not save image API settings'))
-    } finally {
-      setIsImageApiConfigSaving(false)
-    }
-  }
-
   const importDataTransfer = async (dataTransfer: DataTransfer | null) => {
     if (!dataTransfer) return false
 
@@ -2148,7 +2025,6 @@ function App() {
           annotations,
           editPrompt,
           negativePrompt: imageNegativePrompt.trim(),
-          aspectRatio: imageAspectRatio,
           imageDataUrl,
           referenceImageDataUrls,
         }),
@@ -2165,97 +2041,6 @@ function App() {
     } catch (error) {
       const message = error instanceof Error ? localizeKnownMessage(error.message, language) : ''
       setStatus(message ? tr(`交给 Codex 失败：${message}`, `Could not send to Codex: ${message}`) : tr('交给 Codex 失败', 'Could not send to Codex'))
-    }
-  }
-
-  const submitImageApiTask = async () => {
-    if (!activeImage) {
-      setStatus(tr('先放入一张要修改的图片', 'Place an image to edit first.'))
-      return
-    }
-    if (annotations.length === 0 && filledCanvasReferences.length === 0 && !prompt.trim() && !imageNegativePrompt.trim()) {
-      setStatus(tr('先写补充说明、标注位置，或放入参考素材，再用 API 改图', 'Add notes, mark an area, or add reference images before editing with the API.'))
-      return
-    }
-
-    setIsImageApiSubmitting(true)
-    setImageApiMessage('')
-    try {
-      const providerName = getImageProviderText(imageProvider, language, imageProvider)
-      setStatus(tr(`正在提交到 ${providerName} 图片 API...`, `Submitting to ${providerName} image API...`))
-      const imageResponse = await fetch(activeImage.src)
-      if (!imageResponse.ok) throw new Error('读不到当前原图')
-      const imageBlob = await imageResponse.blob()
-      if (!imageBlob.type.startsWith('image/')) throw new Error('当前文件不是图片')
-      const imageDataUrl = await blobToDataUrl(imageBlob)
-      const referenceImageDataUrls = await Promise.all(
-        filledCanvasReferences.map(async (item) => {
-          const referenceResponse = await fetch(item.image.src)
-          if (!referenceResponse.ok) throw new Error(`读不到参考素材：${item.image.title}`)
-          const referenceBlob = await referenceResponse.blob()
-          if (!referenceBlob.type.startsWith('image/')) throw new Error(`参考素材不是图片：${item.image.title}`)
-          return blobToDataUrl(referenceBlob)
-        }),
-      )
-
-      const response = await fetch('/api/image-generation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: imageProvider,
-          image: activeImage,
-          references: filledCanvasReferences.map((item) => ({
-            label: getReferenceLabel(item.index, language),
-            image: item.image,
-          })),
-          annotations,
-          editPrompt,
-          negativePrompt: imageNegativePrompt.trim(),
-          aspectRatio: imageAspectRatio,
-          imageDataUrl,
-          referenceImageDataUrls,
-        }),
-      })
-      const task = (await response.json()) as ImageTaskResponse
-      if (!response.ok || task.error) throw new Error(task.error || '创建图片任务失败')
-
-      const taskProviderName = getImageProviderText(task.provider, language, task.providerName) ?? providerName
-      if (task.status === 'needs_config') {
-        const missing = task.missingEnv?.join(language === 'en' ? ', ' : '、') || tr('图片平台密钥', 'image provider key')
-        const message = tr(`已保存图片任务，但还没提交到 ${taskProviderName}：缺少 ${missing}`, `Image task saved, but it was not submitted to ${taskProviderName}: missing ${missing}`)
-        setImageApiMessage(`${message}\n${tr(`任务目录：${task.directory}`, `Task folder: ${task.directory}`)}`)
-        setStatus(message)
-        return
-      }
-
-      if (task.resultImageUrl && task.resultImagePath) {
-        const title = `${activeImage.title.replace(/\.[^.]+$/, '')}-${task.provider ?? imageProvider}-result`
-        const nextImage: GeneratedImage = {
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          title,
-          src: task.resultImageUrl,
-          prompt: tr(`${taskProviderName} API 改图结果`, `${taskProviderName} API image edit result`),
-          source: 'recent',
-          filePath: task.resultImagePath,
-        }
-        setImages((items) => [nextImage, ...items])
-        setActiveImageId(nextImage.id)
-        setImageApiMessage(tr(`已拿到结果图：${task.resultImagePath}`, `Received result image: ${task.resultImagePath}`))
-        setStatus(tr(`已用 ${taskProviderName} 生成结果图，并放回画布`, `Generated with ${taskProviderName} and placed the result back on the canvas.`))
-        void loadRecentImages()
-        return
-      }
-
-      const taskId = task.providerTaskId ? tr(`，任务 ID：${task.providerTaskId}`, `, task ID: ${task.providerTaskId}`) : ''
-      const message = tr(`已提交到 ${taskProviderName}${taskId}，平台暂时没有直接返回图片`, `Submitted to ${taskProviderName}${taskId}, but the provider did not directly return an image yet.`)
-      setImageApiMessage(`${message}\n${tr(`任务目录：${task.directory}`, `Task folder: ${task.directory}`)}`)
-      setStatus(message)
-    } catch (error) {
-      const message = error instanceof Error ? localizeKnownMessage(error.message, language) : tr('创建图片任务失败', 'Could not create the image task')
-      setImageApiMessage(message)
-      setStatus(tr(`图片 API 改图失败：${message}`, `Image API edit failed: ${message}`))
-    } finally {
-      setIsImageApiSubmitting(false)
     }
   }
 
@@ -2406,88 +2191,6 @@ function App() {
         </select>
       </label>
       <p className="skill-description">{tr(selectedImageSkill.descriptionZh, selectedImageSkill.descriptionEn)}</p>
-      <div className="image-api-panel">
-        <div className="video-block-header">
-          <p className="block-title">{tr('图片 API 生成', 'Image API Generation')}</p>
-          <button type="button" className={`config-toggle-button ${isImageApiSettingsOpen ? 'active' : ''}`} onClick={openImageApiSettings}>
-            <SlidersHorizontal size={14} />
-            {tr('API 设置', 'API Settings')}
-          </button>
-        </div>
-        <div className="segmented-row" aria-label={tr('图片供应商', 'Image providers')}>
-          {imageProviders.map((provider) => (
-            <button
-              key={provider.id}
-              type="button"
-              className={imageProvider === provider.id ? 'active' : ''}
-              onClick={() => setImageProvider(provider.id)}
-              title={tr(provider.noteZh, provider.noteEn)}
-            >
-              {tr(provider.labelZh, provider.labelEn)}
-            </button>
-          ))}
-        </div>
-        <label className="api-field" htmlFor="image-aspect-ratio">
-          <span>{tr('生成比例', 'Aspect Ratio')}</span>
-          <select id="image-aspect-ratio" value={imageAspectRatio} onChange={(event) => setImageAspectRatio(event.target.value)}>
-            {imageAspectRatioOptions.map((ratio) => (
-              <option key={ratio} value={ratio}>
-                {ratio === 'adaptive' ? tr('自动 / 沿用底图', 'Auto / Source') : ratio}
-              </option>
-            ))}
-          </select>
-        </label>
-        {isImageApiSettingsOpen ? (
-          <div className="api-settings-panel">
-            <div className="api-settings-title">
-              <strong>
-                {selectedImageConfig
-                  ? tr(
-                      `${getImageProviderText(selectedImageConfig.id, language, selectedImageConfig.name)} 图片 API 设置`,
-                      `${getImageProviderText(selectedImageConfig.id, language, selectedImageConfig.name)} Image API Settings`,
-                    )
-                  : tr('图片 API 设置', 'Image API Settings')}
-              </strong>
-              <button type="button" onClick={() => void loadImageConfig()} disabled={isImageApiConfigLoading}>
-                <RefreshCcw size={13} />
-                {tr('刷新', 'Refresh')}
-              </button>
-            </div>
-            {isImageApiConfigLoading ? (
-              <p className="recent-empty">{tr('正在读取本地图片 API 设置...', 'Reading local image API settings...')}</p>
-            ) : selectedImageConfig ? (
-              <div className="api-field-list">
-                {selectedImageConfig.fields.map((field) => (
-                  <label key={field.key} className="api-field">
-                    <span>
-                      {getVideoConfigFieldLabel(field, language)}
-                      {field.secret && field.configured ? <small>{tr('已保存', 'Saved')}</small> : null}
-                    </span>
-                    <input
-                      type={field.secret ? 'password' : 'text'}
-                      value={imageConfigValues[field.key] ?? ''}
-                      onChange={(event) => setImageConfigValues((values) => ({ ...values, [field.key]: event.target.value }))}
-                      placeholder={field.secret && field.configured ? tr('已保存，留空不修改', 'Saved. Leave blank to keep it.') : field.placeholder || field.key}
-                      autoComplete="off"
-                    />
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <p className="recent-empty">{tr('还没有读到这个图片平台的设置项。', 'No settings were found for this image provider yet.')}</p>
-            )}
-            {imageConfigMessage ? <p className="config-message">{displayImageConfigMessage}</p> : null}
-            <button type="button" className="secondary-button wide-button" onClick={() => void saveImageApiSettings()} disabled={isImageApiConfigSaving || !selectedImageConfig}>
-              {isImageApiConfigSaving ? tr('正在保存...', 'Saving...') : tr('保存图片 API 设置', 'Save Image API Settings')}
-            </button>
-          </div>
-        ) : null}
-        {imageApiMessage ? <pre className="video-task-message">{displayImageApiMessage}</pre> : null}
-        <button type="button" className="secondary-button wide-button" onClick={() => void submitImageApiTask()} disabled={isImageApiSubmitting || !activeImage}>
-          <ImagePlus size={16} />
-          {isImageApiSubmitting ? tr('正在调用图片 API...', 'Calling image API...') : tr('用 API 生成/改图', 'Generate/Edit With API')}
-        </button>
-      </div>
       <p className="block-title">{tr('从画布读到的改图意见', 'Edit Notes Read From Canvas')}</p>
       <pre className="edit-prompt">{editPrompt || tr('还没有放入图片。', 'No image placed yet.')}</pre>
       <button type="button" className="primary-button" onClick={() => void sendEditTask()}>
@@ -2729,8 +2432,6 @@ function App() {
           </section>
         ) : null}
 
-        {!isVideoPanelOpen ? editControlBlock : null}
-
         <section className="chat-block">
           <div className="button-row">
             <button type="button" className="secondary-button" onClick={() => fileInputRef.current?.click()}>
@@ -2905,6 +2606,8 @@ function App() {
             </div>
           )}
         </section>
+
+        {!isVideoPanelOpen ? editControlBlock : null}
 
       </aside>
 

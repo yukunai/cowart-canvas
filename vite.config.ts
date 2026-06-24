@@ -60,7 +60,7 @@ type CodexTaskRequest = {
 }
 
 type VideoProvider = 'kling' | 'volcengine' | 'wanxiang' | 'runway' | 'luma' | 'fal' | 'replicate'
-type ImageProvider = 'fal' | 'wanxiang' | 'volcengine' | 'kling'
+type ImageProvider = 'fal' | 'wanxiang' | 'volcengine' | 'kling' | 'openai' | 'my' | 'flux' | 'sd'
 type VideoTaskStatus = 'needs_config' | 'submitted' | 'provider_error' | 'ready' | 'saved'
 
 type VideoTaskRequest = {
@@ -166,13 +166,18 @@ const imageProviderNames: Record<ImageProvider, string> = {
   wanxiang: '阿里万象',
   volcengine: '火山方舟',
   kling: '可灵',
+  openai: 'OpenAI',
+  my: 'Midjourney',
+  flux: 'Flux',
+  sd: 'Stable Diffusion (SD)',
 }
-const imageProviderIds: ImageProvider[] = ['fal', 'wanxiang', 'volcengine', 'kling']
+const imageProviderIds: ImageProvider[] = ['fal', 'wanxiang', 'volcengine', 'kling', 'openai', 'my', 'flux', 'sd']
 const defaultArkVideoModel = 'doubao-seedance-2-0-260128'
 const defaultArkImageModel = 'doubao-seedream-4-0-250828'
 const defaultFalImageModel = 'fal-ai/flux-pro/kontext/max/multi'
 const defaultDashScopeImageModel = 'wan2.7-image-pro'
 const defaultKlingImageModel = 'kling-image-o1'
+const defaultOpenAIImageModel = 'gpt-image-1'
 
 const videoConfigFields: Record<VideoProvider, VideoConfigField[]> = {
   kling: [
@@ -235,6 +240,26 @@ const imageConfigFields: Record<ImageProvider, VideoConfigField[]> = {
     { key: 'KLING_SECRET_KEY', label: 'Secret Key', secret: true },
     { key: 'KLING_IMAGE_MODEL', label: '图片模型', placeholder: defaultKlingImageModel },
     { key: 'KLING_IMAGE_ENDPOINT', label: '图片接口地址', placeholder: 'https://api-singapore.klingai.com/v1/images/generations' },
+  ],
+  openai: [
+    { key: 'OPENAI_API_KEY', label: 'API Key', secret: true },
+    { key: 'OPENAI_IMAGE_MODEL', label: '图片模型', placeholder: defaultOpenAIImageModel },
+    { key: 'OPENAI_IMAGE_ENDPOINT', label: '图片接口地址', placeholder: 'https://api.openai.com/v1/images/edits' },
+  ],
+  my: [
+    { key: 'MIDJOURNEY_API_KEY', label: 'API Key', secret: true },
+    { key: 'MIDJOURNEY_IMAGE_MODEL', label: '图片模型', placeholder: 'midjourney' },
+    { key: 'MIDJOURNEY_IMAGE_ENDPOINT', label: '图片接口地址' },
+  ],
+  flux: [
+    { key: 'FLUX_API_KEY', label: 'API Key', secret: true },
+    { key: 'FLUX_IMAGE_MODEL', label: '图片模型', placeholder: 'flux-kontext-pro' },
+    { key: 'FLUX_IMAGE_ENDPOINT', label: '图片接口地址' },
+  ],
+  sd: [
+    { key: 'SD_API_KEY', label: 'API Key', secret: true },
+    { key: 'SD_IMAGE_MODEL', label: '图片模型', placeholder: 'stable-diffusion' },
+    { key: 'SD_IMAGE_ENDPOINT', label: '图片接口地址' },
   ],
 }
 
@@ -1216,6 +1241,113 @@ function buildImageProviderRequest(provider: ImageProvider, task: ImageTaskReque
     }
   }
 
+  if (provider === 'openai') {
+    const missingEnv = presentEnv(['OPENAI_API_KEY'])
+    if (missingEnv.length > 0) return { providerName, missingEnv }
+
+    return {
+      providerName,
+      missingEnv,
+      endpoint: process.env.OPENAI_IMAGE_ENDPOINT || 'https://api.openai.com/v1/images/edits',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: {
+        model: process.env.OPENAI_IMAGE_MODEL || defaultOpenAIImageModel,
+        prompt,
+        size: aspectRatio === 'adaptive' ? 'auto' : imageSizeForAspectRatio(aspectRatio) || 'auto',
+        n: 1,
+      },
+    }
+  }
+
+  if (provider === 'my') {
+    const midjourneyApiKey = process.env.MIDJOURNEY_API_KEY || process.env.MY_API_KEY
+    const midjourneyEndpoint = process.env.MIDJOURNEY_IMAGE_ENDPOINT || process.env.MY_IMAGE_ENDPOINT
+    const midjourneyModel = process.env.MIDJOURNEY_IMAGE_MODEL || process.env.MY_IMAGE_MODEL || 'midjourney'
+    const missingEnv = [
+      midjourneyApiKey ? '' : 'MIDJOURNEY_API_KEY',
+      midjourneyEndpoint ? '' : 'MIDJOURNEY_IMAGE_ENDPOINT',
+    ].filter(Boolean)
+    if (missingEnv.length > 0) return { providerName, missingEnv }
+
+    const inputImages = [image.dataUrl, ...references.map((reference) => reference.dataUrl)]
+    return {
+      providerName,
+      missingEnv,
+      endpoint: midjourneyEndpoint,
+      headers: {
+        Authorization: `Bearer ${midjourneyApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: {
+        model: midjourneyModel,
+        prompt,
+        image: image.dataUrl,
+        images: inputImages,
+        negative_prompt: negativePrompt || undefined,
+        size: aspectRatio === 'adaptive' ? 'adaptive' : imageSizeForAspectRatio(aspectRatio) || 'adaptive',
+        response_format: 'b64_json',
+        n: 1,
+      },
+    }
+  }
+
+  if (provider === 'flux') {
+    const missingEnv = presentEnv(['FLUX_API_KEY', 'FLUX_IMAGE_ENDPOINT'])
+    if (missingEnv.length > 0) return { providerName, missingEnv }
+
+    const inputImages = [image.dataUrl, ...references.map((reference) => reference.dataUrl)]
+    return {
+      providerName,
+      missingEnv,
+      endpoint: process.env.FLUX_IMAGE_ENDPOINT,
+      headers: {
+        Authorization: `Bearer ${process.env.FLUX_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: {
+        model: process.env.FLUX_IMAGE_MODEL || 'flux-kontext-pro',
+        prompt,
+        image: image.dataUrl,
+        images: inputImages,
+        negative_prompt: negativePrompt || undefined,
+        aspect_ratio: aspectRatio === 'adaptive' ? undefined : aspectRatio,
+        size: aspectRatio === 'adaptive' ? 'adaptive' : imageSizeForAspectRatio(aspectRatio) || 'adaptive',
+        response_format: 'b64_json',
+        n: 1,
+      },
+    }
+  }
+
+  if (provider === 'sd') {
+    const missingEnv = presentEnv(['SD_API_KEY', 'SD_IMAGE_ENDPOINT'])
+    if (missingEnv.length > 0) return { providerName, missingEnv }
+
+    const inputImages = [image.dataUrl, ...references.map((reference) => reference.dataUrl)]
+    return {
+      providerName,
+      missingEnv,
+      endpoint: process.env.SD_IMAGE_ENDPOINT,
+      headers: {
+        Authorization: `Bearer ${process.env.SD_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: {
+        model: process.env.SD_IMAGE_MODEL || 'stable-diffusion',
+        prompt,
+        image: image.dataUrl,
+        init_image: image.dataUrl,
+        images: inputImages,
+        negative_prompt: negativePrompt || undefined,
+        aspect_ratio: aspectRatio === 'adaptive' ? undefined : aspectRatio,
+        size: aspectRatio === 'adaptive' ? 'adaptive' : imageSizeForAspectRatio(aspectRatio) || 'adaptive',
+        response_format: 'b64_json',
+        n: 1,
+      },
+    }
+  }
+
   return { providerName, missingEnv: ['UNSUPPORTED_IMAGE_PROVIDER'] }
 }
 
@@ -1334,6 +1466,36 @@ async function postProviderJson(endpoint: string, headers: Record<string, string
     method: 'POST',
     headers,
     body: JSON.stringify(body),
+  })
+  const responseText = await response.text()
+  let payload: unknown
+  try {
+    payload = JSON.parse(responseText)
+  } catch {
+    payload = responseText
+  }
+
+  return { ok: response.ok, status: response.status, payload }
+}
+
+async function postOpenAIImageEdit(endpoint: string, headers: Record<string, string>, body: unknown, image: PreparedVideoImage, references: PreparedVideoImage[]) {
+  const requestBody = isRecord(body) ? body : {}
+  const form = new FormData()
+  form.append('model', getString(requestBody.model) || defaultOpenAIImageModel)
+  form.append('prompt', getString(requestBody.prompt) || 'Edit this image.')
+  form.append('n', String(requestBody.n || 1))
+  const size = getString(requestBody.size)
+  if (size) form.append('size', size)
+
+  form.append('image[]', new Blob([image.buffer], { type: image.mimeType }), `source${extensionForMime(image.mimeType)}`)
+  references.slice(0, 8).forEach((reference, index) => {
+    form.append('image[]', new Blob([reference.buffer], { type: reference.mimeType }), `reference-${index + 1}${extensionForMime(reference.mimeType)}`)
+  })
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: form,
   })
   const responseText = await response.text()
   let payload: unknown
@@ -1663,6 +1825,25 @@ function getRecentImages() {
     .slice(0, 80)
 }
 
+function deleteGeneratedImage(filePath?: string) {
+  if (!filePath || !path.isAbsolute(filePath)) throw new Error('缺少要删除的图片路径')
+
+  const root = path.resolve(process.cwd(), 'codex-image-tasks')
+  const target = path.resolve(filePath)
+  if (!target.startsWith(`${root}${path.sep}`)) throw new Error('只能删除 Cowart 生成任务目录里的图片')
+
+  const fileName = path.basename(target)
+  const extension = path.extname(fileName).toLowerCase()
+  if (!imageMimeTypes[extension]) throw new Error('只能删除图片文件')
+  if (!/^(result|output|generated|edited)/i.test(fileName)) throw new Error('只能删除生成结果图，不能删除原图或参考图')
+
+  const fileStat = safeStat(target)
+  if (!fileStat?.isFile()) throw new Error('找不到这张图片')
+
+  fs.rmSync(target, { force: true })
+  return target
+}
+
 function getRecentDownloadImages() {
   const downloadsDirectory = path.join(os.homedir(), 'Downloads')
   const now = Date.now()
@@ -1732,6 +1913,23 @@ function localImageImportPlugin(): PluginOption {
         } catch {
           res.statusCode = 500
           res.end('Could not read image')
+        }
+      })
+
+      server.middlewares.use('/api/generated-image-delete', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          sendJson(res, { error: 'Method not allowed' })
+          return
+        }
+
+        try {
+          const body = (await readJsonBody(req, 1024 * 1024)) as { path?: string }
+          const deletedPath = deleteGeneratedImage(body.path)
+          sendJson(res, { deletedPath })
+        } catch (error) {
+          res.statusCode = 400
+          sendJson(res, { error: error instanceof Error ? error.message : 'Could not delete image' })
         }
       })
 
@@ -2125,7 +2323,10 @@ function localImageImportPlugin(): PluginOption {
             return
           }
 
-          const providerResponse = await postProviderJson(providerRequest.endpoint, providerRequest.headers, providerRequest.body)
+          const providerResponse =
+            provider === 'openai'
+              ? await postOpenAIImageEdit(providerRequest.endpoint, providerRequest.headers, providerRequest.body, image, preparedReferences)
+              : await postProviderJson(providerRequest.endpoint, providerRequest.headers, providerRequest.body)
           let finalProviderResponse = providerResponse
           let savedOutput = providerResponse.ok ? await saveProviderImageOutput(directory, providerResponse.payload) : {}
           const initialTaskId = extractProviderTaskId(providerResponse.payload)

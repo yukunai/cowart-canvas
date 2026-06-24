@@ -56,7 +56,7 @@
 
       .app {
         display: grid;
-        grid-template-columns: 380px minmax(0, 1fr);
+        grid-template-columns: var(--sidebar-width, 380px) 8px minmax(0, 1fr);
         height: 100vh;
         min-height: 720px;
       }
@@ -65,6 +65,26 @@
         overflow: auto;
         border-right: 1px solid #dce3eb;
         background: #ffffff;
+      }
+
+      .sidebar-resizer {
+        width: 8px;
+        border: 0;
+        border-left: 1px solid #dce3eb;
+        border-right: 1px solid #e8eef5;
+        background: #f2f5f8;
+        cursor: col-resize;
+        padding: 0;
+      }
+
+      .sidebar-resizer::before {
+        display: block;
+        width: 2px;
+        height: 34px;
+        margin: calc(50vh - 17px) auto 0;
+        border-radius: 999px;
+        background: #aab6c4;
+        content: "";
       }
 
       .header,
@@ -132,22 +152,21 @@
         box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.12);
       }
 
-      .provider-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-      }
-
-      .provider-grid button.active {
-        border-color: #1f6feb;
-        background: #eaf2ff;
-        color: #164ea6;
-      }
-
       .button-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 10px;
+      }
+
+      .provider-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 104px;
+        gap: 8px;
+        align-items: end;
+      }
+
+      .provider-row button {
+        min-height: 38px;
       }
 
       .primary {
@@ -198,18 +217,39 @@
 
       .reference-list {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-        gap: 7px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        border: 1px dashed #c4d0dd;
+        border-radius: 10px;
+        background: #f8fafc;
+        padding: 8px;
       }
 
       .reference-card {
         position: relative;
         display: grid;
         gap: 4px;
+        min-width: 0;
         border: 1px solid #d8e0e8;
         border-radius: 9px;
         background: #fbfcfe;
         padding: 5px;
+      }
+
+      .reference-list.dragging {
+        border-color: #1f6feb;
+        background: #eef5ff;
+      }
+
+      .reference-card.empty {
+        min-height: 84px;
+        place-items: center;
+        border-style: dashed;
+        color: #7a8796;
+        font-size: 11px;
+        font-weight: 720;
+        text-align: center;
+        cursor: pointer;
       }
 
       .reference-card img {
@@ -365,6 +405,18 @@
         gap: 10px;
       }
 
+      .danger {
+        border-color: #fecaca;
+        background: #fff7f7;
+        color: #b42318;
+      }
+
+      .danger:hover {
+        border-color: #f87171;
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
       .history {
         display: grid;
         gap: 12px;
@@ -386,6 +438,7 @@
       }
 
       .thumb {
+        position: relative;
         display: grid;
         gap: 8px;
         border: 1px solid #d8e0e8;
@@ -416,6 +469,20 @@
         font-weight: 720;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .thumb-delete {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 28px;
+        min-width: 28px;
+        height: 28px;
+        min-height: 28px;
+        border-color: rgba(248, 113, 113, 0.72);
+        background: rgba(255, 255, 255, 0.92);
+        color: #b42318;
+        padding: 0;
       }
 
       .message {
@@ -451,6 +518,10 @@
         .sidebar {
           border-right: 0;
         }
+
+        .sidebar-resizer {
+          display: none;
+        }
       }
     </style>
   </head>
@@ -467,8 +538,13 @@
 
         <section class="section">
           <h2>选择平台</h2>
-          <div class="provider-grid" id="providerGrid"></div>
-          <button type="button" id="settingsButton">API 设置</button>
+          <div class="provider-row">
+            <label>
+              生图模型 / 平台
+              <select id="providerSelect"></select>
+            </label>
+            <button type="button" id="settingsButton">API 设置</button>
+          </div>
           <div class="settings" id="settingsPanel">
             <div class="title-row">
               <h2 id="settingsTitle">API 设置</h2>
@@ -477,37 +553,6 @@
             <div class="field-grid" id="settingsFields"></div>
             <button type="button" class="primary" id="saveConfigButton">保存 API 设置</button>
           </div>
-        </section>
-
-        <section class="section">
-          <h2>底图</h2>
-          <div class="button-row">
-            <button type="button" id="uploadButton">上传图片</button>
-            <button type="button" id="pasteButton">粘贴图片</button>
-          </div>
-          <input id="fileInput" type="file" accept="image/*" hidden />
-          <div class="drop-zone" id="dropZone">
-            <p>把图片拖到这里，或用上传/粘贴导入</p>
-          </div>
-          <div class="source-preview" id="sourcePreview">
-            <img id="sourceImage" alt="source" />
-            <p id="sourceName"></p>
-          </div>
-        </section>
-
-        <section class="section">
-          <h2>参考图</h2>
-          <p>最多 5 张。可以作为产品、物件、局部元素、人物/风格参考一起传给图片 API。</p>
-          <div class="button-row">
-            <button type="button" id="referenceUploadButton">上传参考图</button>
-            <button type="button" id="referencePasteButton">粘贴参考图</button>
-          </div>
-          <input id="referenceInput" type="file" accept="image/*" multiple hidden />
-          <div class="drop-zone" id="referenceDropZone">
-            <p>把参考图拖到这里</p>
-          </div>
-          <div class="reference-list" id="referenceList"></div>
-          <button type="button" id="clearReferencesButton">清空参考图</button>
         </section>
 
         <section class="section">
@@ -547,7 +592,37 @@
           <button type="button" class="primary" id="generateButton">生成图片</button>
           <pre class="message" id="message">准备就绪。</pre>
         </section>
+
+        <section class="section">
+          <h2>底图</h2>
+          <div class="button-row">
+            <button type="button" id="uploadButton">上传图片</button>
+            <button type="button" id="pasteButton">粘贴图片</button>
+          </div>
+          <input id="fileInput" type="file" accept="image/*" hidden />
+          <div class="drop-zone" id="dropZone">
+            <p>把图片拖到这里，或用上传/粘贴导入</p>
+          </div>
+          <div class="source-preview" id="sourcePreview">
+            <img id="sourceImage" alt="source" />
+            <p id="sourceName"></p>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2>参考图</h2>
+          <p>最多 5 张。可以作为产品、物件、局部元素、人物/风格参考一起传给图片 API。</p>
+          <div class="button-row">
+            <button type="button" id="referenceUploadButton">上传参考图</button>
+            <button type="button" id="referencePasteButton">粘贴参考图</button>
+          </div>
+          <input id="referenceInput" type="file" accept="image/*" multiple hidden />
+          <div class="reference-list" id="referenceDropZone"></div>
+          <button type="button" id="clearReferencesButton">清空参考图</button>
+        </section>
       </aside>
+
+      <button type="button" class="sidebar-resizer" id="sidebarResizer" aria-label="调整左侧宽度"></button>
 
       <section class="main">
         <header class="topbar">
@@ -575,6 +650,10 @@
         { id: "volcengine", name: "火山" },
         { id: "kling", name: "可灵" },
         { id: "fal", name: "fal.ai" },
+        { id: "openai", name: "OpenAI" },
+        { id: "my", name: "Midjourney" },
+        { id: "flux", name: "Flux" },
+        { id: "sd", name: "Stable Diffusion (SD)" },
       ];
 
       const defaultSkills = [
@@ -628,7 +707,7 @@
       let referenceImages = [];
       let selectedHistoryPath = "";
 
-      const providerGrid = document.querySelector("#providerGrid");
+      const providerSelect = document.querySelector("#providerSelect");
       const settingsPanel = document.querySelector("#settingsPanel");
       const settingsTitle = document.querySelector("#settingsTitle");
       const settingsFields = document.querySelector("#settingsFields");
@@ -641,7 +720,7 @@
       const sourceName = document.querySelector("#sourceName");
       const dropZone = document.querySelector("#dropZone");
       const referenceDropZone = document.querySelector("#referenceDropZone");
-      const referenceList = document.querySelector("#referenceList");
+      const referenceList = referenceDropZone;
       const skillSelect = document.querySelector("#skillSelect");
       const skillDescription = document.querySelector("#skillDescription");
       const skillInput = document.querySelector("#skillInput");
@@ -652,6 +731,27 @@
       const heroResult = document.querySelector("#heroResult");
       const historyGrid = document.querySelector("#historyGrid");
       const historyCount = document.querySelector("#historyCount");
+      const sidebarResizer = document.querySelector("#sidebarResizer");
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function startSidebarResize(event) {
+        event.preventDefault();
+        const startX = event.clientX;
+        const startWidth = document.querySelector(".sidebar").getBoundingClientRect().width;
+        const onMove = (moveEvent) => {
+          const nextWidth = clamp(startWidth + moveEvent.clientX - startX, 300, Math.min(620, window.innerWidth - 360));
+          document.documentElement.style.setProperty("--sidebar-width", `${Math.round(nextWidth)}px`);
+        };
+        const onUp = () => {
+          window.removeEventListener("pointermove", onMove);
+          window.removeEventListener("pointerup", onUp);
+        };
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp, { once: true });
+      }
 
       function setMessage(text) {
         message.textContent = text;
@@ -659,19 +759,14 @@
       }
 
       function renderProviders() {
-        providerGrid.innerHTML = "";
+        providerSelect.innerHTML = "";
         for (const provider of providers) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.textContent = provider.name;
-          button.className = provider.id === currentProvider ? "active" : "";
-          button.addEventListener("click", () => {
-            currentProvider = provider.id;
-            renderProviders();
-            renderSettings();
-          });
-          providerGrid.appendChild(button);
+          const option = document.createElement("option");
+          option.value = provider.id;
+          option.textContent = provider.name;
+          providerSelect.appendChild(option);
         }
+        providerSelect.value = currentProvider;
       }
 
       function renderSkills() {
@@ -897,6 +992,14 @@
           card.append(img, title, remove);
           referenceList.appendChild(card);
         }
+        for (let index = referenceImages.length; index < 5; index += 1) {
+          const empty = document.createElement("button");
+          empty.type = "button";
+          empty.className = "reference-card empty";
+          empty.textContent = index === referenceImages.length ? "添加参考图" : "空位";
+          empty.addEventListener("click", () => referenceInput.click());
+          referenceList.appendChild(empty);
+        }
       }
 
       async function pasteImage() {
@@ -1011,26 +1114,66 @@
         download.href = image.url;
         download.download = image.name || "cowart-image.png";
         download.textContent = "下载图片";
-        actions.append(open, download);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "danger";
+        remove.textContent = "删除图片";
+        remove.addEventListener("click", () => deleteGeneratedImage(image));
+        actions.append(open, download, remove);
         card.append(img, meta, actions);
         heroResult.appendChild(card);
         renderHistorySelection();
+      }
+
+      async function deleteGeneratedImage(image) {
+        const ok = window.confirm(`确定删除这张生成图片吗？\n\n${image.name}\n${image.path}`);
+        if (!ok) return;
+        const response = await fetch("/api/generated-image-delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: image.path }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || "删除失败");
+        if (selectedHistoryPath === image.path) {
+          selectedHistoryPath = "";
+          heroResult.innerHTML = `<div class="empty">已删除这张图片。可以从历史生成里选择其它图片。</div>`;
+        }
+        setMessage(`已删除：${image.name}`);
+        await loadHistory();
       }
 
       async function loadHistory() {
         const response = await fetch("/api/recent-images", { cache: "no-store" });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "读取历史结果失败");
-        const images = (data.images || []).filter((image) => /result|output|wanxiang|kling|volcengine|fal/i.test(`${image.name} ${image.path}`));
+        const images = (data.images || []).filter((image) => /result|output|wanxiang|kling|volcengine|fal|openai|my|flux|sd/i.test(`${image.name} ${image.path}`));
         historyCount.textContent = `${images.length} 张`;
         historyGrid.innerHTML = "";
         for (const image of images.slice(0, 40)) {
-          const button = document.createElement("button");
-          button.type = "button";
+          const button = document.createElement("article");
+          button.tabIndex = 0;
+          button.role = "button";
           button.className = `thumb ${selectedHistoryPath === image.path ? "selected" : ""}`;
           button.title = image.path;
           button.innerHTML = `<img src="${image.url}" alt=""><span>${escapeHtml(image.name)}</span>`;
           button.addEventListener("click", () => showResult(image));
+          button.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              showResult(image);
+            }
+          });
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "thumb-delete";
+          remove.textContent = "×";
+          remove.title = "删除图片";
+          remove.addEventListener("click", (event) => {
+            event.stopPropagation();
+            deleteGeneratedImage(image).catch((error) => setMessage(error.message));
+          });
+          button.appendChild(remove);
           historyGrid.appendChild(button);
         }
         if (!selectedHistoryPath && images[0]) showResult(images[0]);
@@ -1050,6 +1193,10 @@
         window.location.href = "/?installed=1";
       });
       document.querySelector("#settingsButton").addEventListener("click", () => settingsPanel.classList.toggle("visible"));
+      providerSelect.addEventListener("change", () => {
+        currentProvider = providerSelect.value;
+        renderSettings();
+      });
       document.querySelector("#refreshConfigButton").addEventListener("click", () => loadConfig().catch((error) => setMessage(error.message)));
       document.querySelector("#saveConfigButton").addEventListener("click", () => saveConfig().catch((error) => setMessage(error.message)));
       document.querySelector("#skillUploadButton").addEventListener("click", () => skillInput.click());
@@ -1066,6 +1213,7 @@
       });
       document.querySelector("#generateButton").addEventListener("click", () => generateImage().catch((error) => setMessage(error.message)));
       document.querySelector("#refreshHistoryButton").addEventListener("click", () => loadHistory().catch((error) => setMessage(error.message)));
+      sidebarResizer.addEventListener("pointerdown", startSidebarResize);
       skillInput.addEventListener("change", () => {
         uploadSkillFile(skillInput.files?.[0]).catch((error) => setMessage(error.message));
         skillInput.value = "";
@@ -1111,6 +1259,7 @@
 
       renderProviders();
       renderSkills();
+      renderReferenceList();
       loadConfig().catch((error) => setMessage(error.message));
       loadHistory().catch((error) => setMessage(error.message));
     </script>
