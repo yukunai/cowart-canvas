@@ -417,6 +417,22 @@
         color: #991b1b;
       }
 
+      .result-delete {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-1px);
+        transition:
+          opacity 140ms ease,
+          transform 140ms ease;
+      }
+
+      .result-card:hover .result-delete,
+      .result-card:focus-within .result-delete {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+      }
+
       .history {
         display: grid;
         gap: 12px;
@@ -475,14 +491,33 @@
         position: absolute;
         top: 8px;
         right: 8px;
-        width: 28px;
-        min-width: 28px;
-        height: 28px;
-        min-height: 28px;
-        border-color: rgba(248, 113, 113, 0.72);
-        background: rgba(255, 255, 255, 0.92);
+        width: 22px;
+        min-width: 22px;
+        height: 22px;
+        min-height: 22px;
+        border-color: rgba(248, 113, 113, 0.42);
+        background: rgba(255, 255, 255, 0.78);
         color: #b42318;
+        font-size: 14px;
+        opacity: 0;
         padding: 0;
+        pointer-events: none;
+        transform: scale(0.92);
+        transition:
+          opacity 140ms ease,
+          background 140ms ease,
+          transform 140ms ease;
+      }
+
+      .thumb:hover .thumb-delete,
+      .thumb:focus-within .thumb-delete {
+        opacity: 1;
+        pointer-events: auto;
+        transform: scale(1);
+      }
+
+      .thumb-delete:hover {
+        background: rgba(255, 255, 255, 0.96);
       }
 
       .message {
@@ -1116,7 +1151,7 @@
         download.textContent = "下载图片";
         const remove = document.createElement("button");
         remove.type = "button";
-        remove.className = "danger";
+        remove.className = "danger result-delete";
         remove.textContent = "删除图片";
         remove.addEventListener("click", () => deleteGeneratedImage(image));
         actions.append(open, download, remove);
