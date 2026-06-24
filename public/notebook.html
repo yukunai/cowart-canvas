@@ -66,7 +66,7 @@
 
       .app {
         display: grid;
-        grid-template-columns: var(--category-width, 260px) 8px var(--note-width, 320px) 8px minmax(0, 1fr);
+        grid-template-columns: var(--category-width, 260px) 12px var(--note-width, 320px) 12px minmax(0, 1fr);
         height: 100vh;
         min-height: 720px;
       }
@@ -79,8 +79,8 @@
       }
 
       .pane-resizer {
-        width: 8px;
-        min-width: 8px;
+        width: 12px;
+        min-width: 12px;
         border: 0;
         border-left: 1px solid #dce3eb;
         border-right: 1px solid #e8eef5;
@@ -88,6 +88,8 @@
         background: #f2f5f8;
         cursor: col-resize;
         padding: 0;
+        touch-action: none;
+        user-select: none;
       }
 
       .pane-resizer::before {
@@ -343,7 +345,7 @@
         line-height: 1.45;
       }
 
-      @media (max-width: 980px) {
+      @media (max-width: 640px) {
         .app {
           grid-template-columns: 1fr;
           height: auto;
@@ -427,6 +429,7 @@
       let storagePath = data.storagePath || "";
       let saveTimer = null;
       let menuCategoryId = "";
+      let hasLocalChanges = false;
 
       const categoryList = document.querySelector("#categoryList");
       const noteList = document.querySelector("#noteList");
@@ -512,6 +515,7 @@
           const response = await fetch(`${apiBase}/api/notebook`, { cache: "no-store" });
           const next = await response.json();
           if (!response.ok || next.error) throw new Error(next.error || "读取文本失败");
+          if (hasLocalChanges) return;
           data = normalizeNotebook(next);
           storagePath = next.storagePath || "";
           activeCategoryId = data.activeCategoryId || data.categories[0]?.id;
@@ -546,6 +550,7 @@
       }
 
       function saveNotebook() {
+        hasLocalChanges = true;
         persistLocalBackup();
         scheduleDiskSave();
       }
