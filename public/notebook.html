@@ -134,6 +134,10 @@
         gap: 8px;
       }
 
+      .category-actions {
+        grid-template-columns: 1fr;
+      }
+
       .list {
         display: grid;
         gap: 8px;
@@ -177,6 +181,40 @@
         font-size: 12px;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .context-menu {
+        position: fixed;
+        z-index: 20;
+        display: none;
+        min-width: 132px;
+        overflow: hidden;
+        border: 1px solid #d8e0e8;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 14px 36px rgba(20, 36, 56, 0.16);
+        padding: 6px;
+      }
+
+      .context-menu.open {
+        display: grid;
+        gap: 4px;
+      }
+
+      .context-menu button {
+        min-height: 34px;
+        justify-content: flex-start;
+        border: 0;
+        background: transparent;
+        padding: 0 10px;
+      }
+
+      .context-menu button:hover {
+        background: #f2f6fb;
+      }
+
+      .context-menu button.danger {
+        color: #d92d20;
       }
 
       .editor {
@@ -341,12 +379,9 @@
           <p class="storage-path" id="storagePathText">正在读取保存位置...</p>
         </section>
         <section class="panel">
-          <div class="utility-row">
-            <button type="button" class="primary" id="addCategoryButton">新分类</button>
-            <button type="button" id="renameCategoryButton">改名</button>
-            <button type="button" class="danger" id="deleteCategoryButton">删分类</button>
+          <div class="utility-row category-actions">
+            <button type="button" class="primary" id="addCategoryButton">分类</button>
           </div>
-          <input id="categoryNameInput" placeholder="分类名称" />
         </section>
         <div class="list" id="categoryList"></div>
       </aside>
@@ -378,6 +413,11 @@
       </section>
     </main>
 
+    <div class="context-menu" id="categoryMenu" role="menu">
+      <button type="button" id="renameCategoryMenuItem">改名</button>
+      <button type="button" class="danger" id="deleteCategoryMenuItem">删除</button>
+    </div>
+
     <script>
       const storageKey = "cowart-markdown-notebook";
       const apiBase = location.protocol === "file:" ? "http://127.0.0.1:43219" : "";
@@ -386,16 +426,17 @@
       let activeNoteId = data.activeNoteId || data.categories[0]?.notes[0]?.id;
       let storagePath = data.storagePath || "";
       let saveTimer = null;
+      let menuCategoryId = "";
 
       const categoryList = document.querySelector("#categoryList");
       const noteList = document.querySelector("#noteList");
-      const categoryNameInput = document.querySelector("#categoryNameInput");
       const noteSearchInput = document.querySelector("#noteSearchInput");
       const noteTitleInput = document.querySelector("#noteTitleInput");
       const noteContentInput = document.querySelector("#noteContentInput");
       const preview = document.querySelector("#preview");
       const exportButton = document.querySelector("#exportButton");
       const storagePathText = document.querySelector("#storagePathText");
+      const categoryMenu = document.querySelector("#categoryMenu");
 
       function clamp(value, min, max) {
         return Math.min(max, Math.max(min, value));
@@ -532,6 +573,10 @@
         return data.categories.find((category) => category.id === activeCategoryId) || data.categories[0];
       }
 
+      function categoryById(id) {
+        return data.categories.find((category) => category.id === id);
+      }
+
       function activeNote() {
         const category = activeCategory();
         return category?.notes.find((note) => note.id === activeNoteId) || category?.notes[0];
@@ -599,8 +644,6 @@
 
       function renderCategories() {
         categoryList.innerHTML = "";
-        const selectedCategory = activeCategory();
-        categoryNameInput.value = selectedCategory?.name || "";
         for (const category of data.categories) {
           const button = document.createElement("button");
           button.type = "button";
@@ -611,6 +654,15 @@
             activeNoteId = category.notes[0]?.id;
             saveNotebook();
             renderAll();
+          });
+          button.addEventListener("contextmenu", (event) => {
+            event.preventDefault();
+            activeCategoryId = category.id;
+            activeNoteId = category.notes[0]?.id;
+            menuCategoryId = category.id;
+            saveNotebook();
+            renderAll();
+            showCategoryMenu(event.clientX, event.clientY);
           });
           categoryList.appendChild(button);
         }
@@ -667,29 +719,36 @@
       }
 
       function addCategory() {
-        const name = categoryNameInput.value.trim() || "新分类";
+        const name = nextCategoryName();
         const category = { id: createId("category"), name, notes: [] };
         data.categories.unshift(category);
         activeCategoryId = category.id;
         activeNoteId = undefined;
-        categoryNameInput.value = "";
         saveNotebook();
         renderAll();
       }
 
-      function renameCategory() {
-        const category = activeCategory();
+      function nextCategoryName() {
+        const base = "分类";
+        if (!data.categories.some((category) => category.name === base)) return base;
+        let index = data.categories.length + 1;
+        while (data.categories.some((category) => category.name === `${base} ${index}`)) index += 1;
+        return `${base} ${index}`;
+      }
+
+      function renameCategory(category = activeCategory()) {
         if (!category) return;
-        const name = categoryNameInput.value.trim();
+        hideCategoryMenu();
+        const name = window.prompt("分类名称", category.name)?.trim();
         if (!name) return;
         category.name = name;
         saveNotebook();
-        renderCategories();
+        renderAll();
       }
 
-      function deleteCategory() {
-        const category = activeCategory();
+      function deleteCategory(category = activeCategory()) {
         if (!category) return;
+        hideCategoryMenu();
         if (!window.confirm(`确定删除分类“${category.name}”以及其中 ${category.notes.length} 篇笔记吗？`)) return;
         data.categories = data.categories.filter((item) => item.id !== category.id);
         if (data.categories.length === 0) data = createDefaultNotebook();
@@ -697,6 +756,22 @@
         activeNoteId = data.categories[0]?.notes[0]?.id;
         saveNotebook();
         renderAll();
+      }
+
+      function showCategoryMenu(x, y) {
+        const padding = 8;
+        categoryMenu.classList.add("open");
+        const rect = categoryMenu.getBoundingClientRect();
+        categoryMenu.style.left = `${Math.min(x, window.innerWidth - rect.width - padding)}px`;
+        categoryMenu.style.top = `${Math.min(y, window.innerHeight - rect.height - padding)}px`;
+      }
+
+      function hideCategoryMenu() {
+        categoryMenu.classList.remove("open");
+      }
+
+      function menuCategory() {
+        return categoryById(menuCategoryId) || activeCategory();
       }
 
       function addNote() {
@@ -761,8 +836,8 @@
         window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1` : "/?installed=1";
       });
       document.querySelector("#addCategoryButton").addEventListener("click", addCategory);
-      document.querySelector("#renameCategoryButton").addEventListener("click", renameCategory);
-      document.querySelector("#deleteCategoryButton").addEventListener("click", deleteCategory);
+      document.querySelector("#renameCategoryMenuItem").addEventListener("click", () => renameCategory(menuCategory()));
+      document.querySelector("#deleteCategoryMenuItem").addEventListener("click", () => deleteCategory(menuCategory()));
       document.querySelector("#addNoteButton").addEventListener("click", addNote);
       document.querySelector("#deleteNoteButton").addEventListener("click", deleteNote);
       document.querySelector("#exportButton").addEventListener("click", exportMarkdown);
@@ -771,6 +846,13 @@
       noteContentInput.addEventListener("input", updateActiveNote);
       document.querySelector("#categoryResizer").addEventListener("pointerdown", (event) => startPaneResize(event, "--category-width", 180, 460));
       document.querySelector("#noteResizer").addEventListener("pointerdown", (event) => startPaneResize(event, "--note-width", 220, 560));
+      window.addEventListener("click", (event) => {
+        if (!categoryMenu.contains(event.target)) hideCategoryMenu();
+      });
+      window.addEventListener("scroll", hideCategoryMenu, true);
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") hideCategoryMenu();
+      });
 
       restorePaneWidths();
       renderAll();
