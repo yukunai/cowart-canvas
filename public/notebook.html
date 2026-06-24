@@ -141,38 +141,39 @@
 
       .list {
         display: grid;
-        gap: 8px;
-        padding: 12px;
+        gap: 2px;
+        padding: 8px 10px 12px;
       }
 
       .item {
         display: grid;
         gap: 4px;
         width: 100%;
-        min-height: 52px;
-        border: 1px solid #d8e0e8;
-        border-radius: 9px;
-        background: #ffffff;
+        min-height: 40px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
         color: #24313f;
         text-align: left;
-        padding: 10px;
+        padding: 8px 10px;
       }
 
       .category-item {
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
-        min-height: 42px;
+        min-height: 38px;
+        position: relative;
       }
 
       .category-group {
         display: grid;
-        gap: 6px;
+        gap: 2px;
       }
 
       .category-note-list {
         display: grid;
-        gap: 6px;
-        padding-left: 14px;
+        gap: 1px;
+        padding-left: 12px;
       }
 
       .note-tree-item {
@@ -180,18 +181,23 @@
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
         width: 100%;
-        min-height: 36px;
-        border: 1px solid #e1e8f0;
-        border-radius: 8px;
-        background: #f8fafc;
+        min-height: 32px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
         color: #344054;
         text-align: left;
-        padding: 7px 9px;
+        padding: 6px 9px;
+      }
+
+      .item:hover,
+      .note-tree-item:hover {
+        background: #f5f7fa;
+        color: #185abc;
       }
 
       .note-tree-item.active {
-        border-color: #1f6feb;
-        background: #eff6ff;
+        background: #eef5ff;
         color: #164ea6;
       }
 
@@ -230,9 +236,20 @@
       }
 
       .item.active {
-        border-color: #1f6feb;
-        background: #eff6ff;
-        box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.12);
+        background: #eef5ff;
+        color: #164ea6;
+        box-shadow: none;
+      }
+
+      .category-item.active::before {
+        position: absolute;
+        left: 0;
+        top: 9px;
+        width: 3px;
+        height: calc(100% - 18px);
+        border-radius: 999px;
+        background: #1f6feb;
+        content: "";
       }
 
       .item strong {
