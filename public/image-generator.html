@@ -103,19 +103,24 @@
       }
 
       .mode-nav {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        display: flex;
         gap: 8px;
       }
 
       .mode-nav button {
+        flex: 0 0 76px;
+        width: 76px;
+        min-height: 34px;
         padding: 0 10px;
+        color: #24313f;
+        font-size: 13px;
+        font-weight: 780;
       }
 
       .mode-nav button.active {
         border-color: #1f6feb;
-        background: #eff6ff;
-        color: #185abc;
+        background: #eaf2ff;
+        color: #164ea6;
       }
 
       h1 {

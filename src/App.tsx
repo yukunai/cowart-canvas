@@ -2234,7 +2234,6 @@ function App() {
               window.location.href = '/image-generator.html'
             }}
           >
-            <ImagePlus size={15} />
             {tr('图片', 'Image')}
           </button>
           <button
@@ -2244,7 +2243,6 @@ function App() {
               window.location.href = '/product-detail-generator.html'
             }}
           >
-            <ImagePlus size={15} />
             {tr('设计', 'Design')}
           </button>
           <button
@@ -2256,7 +2254,6 @@ function App() {
               if (!activeImage) setStatus(tr('可以先从最近生成里点一张，作为视频首帧', 'Pick a recent generated image first to use as the first frame.'))
             }}
           >
-            <Video size={15} />
             {tr('视频', 'Video')}
           </button>
           <button
