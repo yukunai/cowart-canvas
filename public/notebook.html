@@ -412,20 +412,29 @@
         position: absolute;
         top: 5px;
         right: 5px;
-        min-height: 20px;
+        display: grid;
+        place-items: center;
+        width: 24px;
+        min-width: 24px;
+        height: 24px;
+        min-height: 24px;
         border: 1px solid rgba(255, 255, 255, 0.18);
-        border-radius: 5px;
-        background: rgba(15, 23, 42, 0.78);
+        border-radius: 6px;
+        background: rgba(15, 23, 42, 0.46);
         color: #e5e7eb;
-        font-size: 9px;
-        font-weight: 620;
-        padding: 0 6px;
+        padding: 0;
       }
 
       .copy-code-button:hover {
         border-color: rgba(255, 255, 255, 0.36);
-        background: rgba(30, 41, 59, 0.92);
+        background: rgba(30, 41, 59, 0.84);
         color: #ffffff;
+      }
+
+      .copy-code-button svg {
+        width: 14px;
+        height: 14px;
+        pointer-events: none;
       }
 
       .preview code {
@@ -739,6 +748,8 @@
         const html = [];
         let inCode = false;
         let listOpen = false;
+        const copyIcon =
+          '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8" y="8" width="10" height="10" rx="2" stroke="currentColor" stroke-width="2"/><path d="M6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
         for (const rawLine of lines) {
           const line = rawLine;
           if (line.trim().startsWith("```")) {
@@ -746,7 +757,7 @@
               html.push("</ul>");
               listOpen = false;
             }
-            html.push(inCode ? "</code></pre></div>" : '<div class="code-block"><button type="button" class="copy-code-button">复制</button><pre><code>');
+            html.push(inCode ? "</code></pre></div>" : `<div class="code-block"><button type="button" class="copy-code-button" aria-label="复制代码" title="复制代码">${copyIcon}</button><pre><code>`);
             inCode = !inCode;
             continue;
           }
@@ -1089,10 +1100,14 @@
           document.execCommand("copy");
           textarea.remove();
         }
-        const originalText = button.textContent;
-        button.textContent = "已复制";
+        const originalHtml = button.innerHTML;
+        button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        button.setAttribute("aria-label", "已复制");
+        button.setAttribute("title", "已复制");
         window.setTimeout(() => {
-          button.textContent = originalText || "复制";
+          button.innerHTML = originalHtml;
+          button.setAttribute("aria-label", "复制代码");
+          button.setAttribute("title", "复制代码");
         }, 1200);
       }
 
