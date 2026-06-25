@@ -123,6 +123,32 @@ Remove the background service:
 npm run uninstall:mac
 ```
 
+## Browser Extension Launcher
+
+If you want Cowart available from every browser window without copying `127.0.0.1:43219`, install the bundled Chrome/Edge extension launcher.
+
+1. Start Cowart locally with `npm run dev` or install the macOS background service.
+2. Open the extension folder:
+
+```bash
+npm run open:extension
+```
+
+3. In Chrome or Edge, open `chrome://extensions`.
+4. Turn on `Developer mode`.
+5. Click `Load unpacked`.
+6. Select the `browser-extension` folder.
+
+After installation, pin the Cowart icon in the browser toolbar. The popup can open:
+
+- Canvas
+- Image
+- Design
+- Video
+- Text
+
+The default local address is `http://127.0.0.1:43219`. If you run Cowart on a different port, edit the address in the extension popup once and it will remember it.
+
 ## How Image Import Works
 
 `Generated` is intentionally narrow. It does not list screenshots, clipboard images, Downloads, Desktop files, or temporary `codex-clipboard-*` images. It only lists:

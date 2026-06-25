@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cowart Canvas</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <header>
+        <img src="icons/icon.svg" alt="" />
+        <div>
+          <strong>Cowart Canvas</strong>
+          <span>本机创作工作台</span>
+        </div>
+      </header>
+      <div class="grid">
+        <button type="button" data-path="/?installed=1">画布</button>
+        <button type="button" data-path="/image-generator.html">图片</button>
+        <button type="button" data-path="/product-detail-generator.html">设计</button>
+        <button type="button" data-path="/?installed=1&video=1">视频</button>
+        <button type="button" data-path="/notebook.html">文本</button>
+      </div>
+      <label>
+        <span>本机地址</span>
+        <input id="baseUrlInput" value="http://127.0.0.1:43219" />
+      </label>
+      <p id="status">如果端口改了，在这里改一次就会记住。</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

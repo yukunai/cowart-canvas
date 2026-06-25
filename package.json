@@ -9,6 +9,7 @@
     "dev": "vite --host 127.0.0.1 --port 43219",
     "start": "vite --host 127.0.0.1 --port 43219",
     "open": "scripts/open-cowart-canvas.sh",
+    "open:extension": "open browser-extension",
     "install:mac": "scripts/install-cowart-canvas-launch-agent.sh",
     "uninstall:mac": "scripts/uninstall-cowart-canvas-launch-agent.sh",
     "build": "tsc -b && vite build",

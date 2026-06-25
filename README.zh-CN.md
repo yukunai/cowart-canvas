@@ -125,6 +125,32 @@ npm run open
 npm run uninstall:mac
 ```
 
+## 浏览器扩展启动器
+
+如果你希望每个浏览器窗口都能一键打开 Cowart，而不是每次复制 `127.0.0.1:43219`，可以安装仓库内置的 Chrome/Edge 扩展启动器。
+
+1. 先用 `npm run dev` 启动 Cowart，或者安装 macOS 后台服务。
+2. 打开扩展目录：
+
+```bash
+npm run open:extension
+```
+
+3. 在 Chrome 或 Edge 中打开 `chrome://extensions`。
+4. 打开 `开发者模式`。
+5. 点击 `加载已解压的扩展程序`。
+6. 选择仓库里的 `browser-extension` 文件夹。
+
+安装后，把 Cowart 图标固定到浏览器工具栏。以后任意浏览器窗口里点这个图标，就可以打开：
+
+- 画布
+- 图片
+- 设计
+- 视频
+- 文本
+
+默认本机地址是 `http://127.0.0.1:43219`。如果你换了端口，在扩展弹窗里改一次地址，它会记住。
+
 ## 图片导入逻辑
 
 `最近生成` 的范围是刻意收窄的。它不会显示截图、剪贴板图片、Downloads、Desktop 文件，也不会显示临时的 `codex-clipboard-*` 图片。它只会读取：
