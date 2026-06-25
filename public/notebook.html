@@ -778,6 +778,8 @@
       let editingCategoryId = "";
       let editingNoteId = "";
       let hasLocalChanges = false;
+      let lastLocalChangeAt = 0;
+      let saveInFlight = Promise.resolve();
       let searchQuery = "";
 
       const categoryList = document.querySelector("#categoryList");
@@ -889,7 +891,8 @@
 
       async function loadNotebookFromDisk(options = {}) {
         const { force = false, preserveSelection = true } = options;
-        if (!force && (hasLocalChanges || isEditingText())) return;
+        const justEdited = Date.now() - lastLocalChangeAt < 1500;
+        if (!force && (hasLocalChanges || justEdited || isEditingText())) return;
         try {
           const response = await fetch(`${apiBase}/api/notebook`, { cache: "no-store" });
           const next = await response.json();
@@ -939,6 +942,7 @@
 
       function saveNotebook() {
         hasLocalChanges = true;
+        lastLocalChangeAt = Date.now();
         persistLocalBackup();
         scheduleDiskSave();
       }
@@ -946,7 +950,7 @@
       function scheduleDiskSave() {
         window.clearTimeout(saveTimer);
         saveTimer = window.setTimeout(() => {
-          saveNotebookToDisk().catch(() => {});
+          saveInFlight = saveNotebookToDisk().catch(() => {});
         }, 250);
       }
 
@@ -965,8 +969,9 @@
       }
 
       function flushNotebookSave() {
-        if (!hasLocalChanges) return;
-        saveNotebookToDisk().catch(() => {});
+        if (!hasLocalChanges) return saveInFlight;
+        saveInFlight = saveNotebookToDisk().catch(() => {});
+        return saveInFlight;
       }
 
       function activeCategory() {
@@ -1801,7 +1806,7 @@
         if (document.visibilityState === "visible") loadNotebookFromDisk();
       });
       window.addEventListener("storage", (event) => {
-        if (event.key === storageKey) loadNotebookFromDisk({ force: true });
+        if (event.key === storageKey) loadNotebookFromDisk();
       });
       window.setInterval(() => loadNotebookFromDisk(), 5000);
 
