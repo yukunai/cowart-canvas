@@ -91,6 +91,18 @@ Standalone product-detail image generator:
 http://127.0.0.1:43219/product-detail-generator.html
 ```
 
+Narrow toolbar launcher:
+
+```text
+http://127.0.0.1:43219/launcher.html
+```
+
+You can also open it with:
+
+```bash
+npm run open:launcher
+```
+
 Standalone Text page:
 
 ```text

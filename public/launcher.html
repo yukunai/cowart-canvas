@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cowart 启动器</title>
+    <style>
+      :root {
+        color: #1f2937;
+        background: #f5f8fc;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 96px;
+        min-width: 86px;
+        max-width: 128px;
+        min-height: 100vh;
+        margin: 0;
+        overflow-x: hidden;
+        background: #f5f8fc;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .launcher {
+        display: grid;
+        gap: 8px;
+        align-content: start;
+        min-height: 100vh;
+        padding: 10px 8px;
+      }
+
+      .brand {
+        display: grid;
+        justify-items: center;
+        gap: 5px;
+        padding: 4px 0 8px;
+        color: #334155;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: #101828;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+      }
+
+      .brand-mark svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      .nav {
+        display: grid;
+        gap: 7px;
+      }
+
+      .nav button {
+        display: grid;
+        justify-items: center;
+        gap: 4px;
+        width: 100%;
+        min-height: 58px;
+        border: 1px solid #d2dce8;
+        border-radius: 9px;
+        background: #ffffff;
+        color: #243244;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 800;
+        padding: 7px 4px;
+      }
+
+      .nav button:hover,
+      .nav button.active {
+        border-color: #2f77ec;
+        background: #eef5ff;
+        color: #185abc;
+      }
+
+      .nav svg {
+        width: 18px;
+        height: 18px;
+        stroke-width: 2.2;
+      }
+
+      .hint {
+        color: #728197;
+        font-size: 10px;
+        line-height: 1.35;
+        text-align: center;
+      }
+
+      @media (max-width: 90px) {
+        body {
+          width: 86px;
+        }
+
+        .launcher {
+          padding: 8px 6px;
+        }
+
+        .nav button {
+          min-height: 54px;
+          font-size: 11px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="launcher" aria-label="Cowart 启动器">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="4" y="4" width="16" height="16" rx="4" fill="#f8fbff" />
+            <path d="M7 15c3-3 5-1 8-5 1-1 2-2 3-3" stroke="#2563eb" stroke-linecap="round" />
+            <path d="M14.5 10.5 18 7l1 1-3.5 3.5-2 .8.8-1.8z" fill="#111827" />
+          </svg>
+        </span>
+        <span>Cowart</span>
+      </div>
+
+      <nav class="nav">
+        <button type="button" data-path="/image-generator.html" title="图片">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="3" y="5" width="18" height="14" rx="3" />
+            <path d="m7 15 3-3 3 3 2-2 3 3" />
+            <circle cx="9" cy="9" r="1.5" />
+          </svg>
+          <span>图片</span>
+        </button>
+        <button type="button" data-path="/product-detail-generator.html" title="设计">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M4 7h16" />
+            <path d="M7 4h10" />
+            <rect x="5" y="7" width="14" height="13" rx="3" />
+            <path d="M9 12h6M9 16h4" />
+          </svg>
+          <span>设计</span>
+        </button>
+        <button type="button" data-path="/?installed=1&video=1" title="视频">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="4" y="6" width="12" height="12" rx="3" />
+            <path d="m16 10 4-2v8l-4-2" />
+          </svg>
+          <span>视频</span>
+        </button>
+        <button type="button" data-path="/?installed=1" title="画布">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M4 5h16v12H4z" />
+            <path d="M8 21h8M12 17v4" />
+          </svg>
+          <span>画布</span>
+        </button>
+        <button type="button" data-path="/notebook.html" title="文本">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M6 4h12v16H6z" />
+            <path d="M9 8h6M9 12h6M9 16h4" />
+          </svg>
+          <span>文本</span>
+        </button>
+      </nav>
+
+      <p class="hint">贴在旁边<br />随手打开</p>
+    </main>
+
+    <script>
+      const activePath = new URL(location.href).searchParams.get("active") || "";
+
+      function openPage(path) {
+        const url = new URL(path, location.origin);
+        window.open(url.href, "cowart-main");
+      }
+
+      for (const button of document.querySelectorAll("button[data-path]")) {
+        if (activePath && button.dataset.path.includes(activePath)) button.classList.add("active");
+        button.addEventListener("click", () => openPage(button.dataset.path));
+      }
+    </script>
+  </body>
+</html>

@@ -93,6 +93,18 @@ http://127.0.0.1:43219/
 http://127.0.0.1:43219/image-generator.html
 ```
 
+窄工具条启动器：
+
+```text
+http://127.0.0.1:43219/launcher.html
+```
+
+也可以直接运行：
+
+```bash
+npm run open:launcher
+```
+
 独立商品详情页生成：
 
 ```text
