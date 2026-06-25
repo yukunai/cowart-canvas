@@ -1192,6 +1192,9 @@
               noteButton.addEventListener("click", () => {
                 selectNote(category.id, note.id);
               });
+              noteButton.addEventListener("dblclick", () => {
+                renameNote(note);
+              });
               noteButton.addEventListener("contextmenu", (event) => {
                 event.preventDefault();
                 activeCategoryId = category.id;
