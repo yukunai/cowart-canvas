@@ -194,8 +194,11 @@ http://127.0.0.1:43219/notebook.html
 - 每篇笔记可以填写标签，多个标签用逗号分隔。
 - 笔记可以右键 `置顶` 或 `收藏`，置顶笔记会显示在分类最上方。
 - 编辑区支持 `H1`、`H2` 快捷按钮；当笔记里有多个标题时，右侧预览会自动生成目录。
+- 可以对选中文字加粗，也可以给选中文字设置自定义颜色。
 - 支持插入代码块，并可以选择代码语言，例如 JavaScript、TypeScript、Python、Bash、JSON、Markdown、Text。
 - 右侧预览里的每个代码块都有复制按钮，可以一键复制该代码块。
+- 可以上传图片到当前笔记，Cowart 会保存到本机并在光标位置插入 Markdown 图片语法。
+- 可以从 `最近生成` 中选择 Codex/Cowart 最近生成的图片，直接插入当前笔记。
 - 可以一键复制整篇 Markdown，也可以导出 `.md` 文件。
 - 左侧分类栏可以拖拽调整宽度。
 - 点击 `备份` 会把当前所有文本笔记复制一份到本机备份目录。
@@ -210,6 +213,12 @@ http://127.0.0.1:43219/notebook.html
 
 ```text
 ~/.cowart-canvas/text-note-backups
+```
+
+上传到笔记里的图片会写入：
+
+```text
+~/.cowart-canvas/text-note-images
 ```
 
 这些目录属于本机运行数据，不会提交到仓库。
@@ -282,6 +291,7 @@ npm run build
 - `video-tasks`
 - `text-notes`
 - `text-note-backups`
+- `text-note-images`
 - `.env.local`
 - 桌面端打包产物
 

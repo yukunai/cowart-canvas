@@ -184,8 +184,11 @@ Text page features:
 - Add comma-separated tags to each note.
 - Right-click a note to pin it or mark it as favorite. Pinned notes stay at the top of their category.
 - Use `H1` and `H2` buttons to insert headings. The preview automatically creates a table of contents when there is more than one heading.
+- Apply bold text or a custom text color to the current selection.
 - Insert fenced code blocks with a language selector such as JavaScript, TypeScript, Python, Bash, JSON, Markdown, or Text.
 - Copy a single rendered code block from the preview with the copy icon.
+- Upload an image into the current note. Cowart saves it locally and inserts Markdown image syntax at the cursor.
+- Insert a recent Codex/Cowart generated image into the current note from the `Generated` picker.
 - Copy the full Markdown note or export it as a `.md` file.
 - Drag the left divider to resize the note/category sidebar.
 - Click `Backup` to create a local backup copy of all notes.
@@ -200,6 +203,12 @@ Manual backups are written to:
 
 ```text
 ~/.cowart-canvas/text-note-backups
+```
+
+Uploaded note images are written to:
+
+```text
+~/.cowart-canvas/text-note-images
 ```
 
 These note folders are local runtime data and are not committed to the repository.
@@ -272,6 +281,7 @@ The following local/runtime folders are ignored:
 - `video-tasks`
 - `text-notes`
 - `text-note-backups`
+- `text-note-images`
 - `.env.local`
 - desktop packaging outputs
 

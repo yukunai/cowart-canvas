@@ -378,6 +378,10 @@ function getNotebookBackupDirectory() {
   return path.join(os.homedir(), '.cowart-canvas', 'text-note-backups')
 }
 
+function getNotebookImageDirectory() {
+  return path.join(os.homedir(), '.cowart-canvas', 'text-note-images')
+}
+
 function createDefaultNotebookData(): NotebookData {
   const categoryId = `category-${Date.now()}`
   const noteId = `note-${Date.now()}`
@@ -542,6 +546,25 @@ function backupNotebookData() {
     backupPath,
     storagePath: sourceDirectory,
     updatedAt: new Date().toISOString(),
+  }
+}
+
+function saveNotebookImage(input: unknown) {
+  const record = isRecord(input) ? input : {}
+  const prepared = parseImageDataUrl(getString(record.dataUrl))
+  if (!prepared) throw new Error('Invalid image')
+
+  const extension = extensionForMime(prepared.mimeType)
+  const baseName = notebookSafeFileName(getString(record.name) || 'note-image', 'note-image').replace(/\.[^.]+$/, '')
+  const directory = getNotebookImageDirectory()
+  fs.mkdirSync(directory, { recursive: true })
+  const fileName = `${new Date().toISOString().replace(/[:.]/g, '-')}-${baseName}${extension}`
+  const filePath = path.join(directory, fileName)
+  fs.writeFileSync(filePath, prepared.buffer)
+  return {
+    filePath,
+    url: `/api/local-image?path=${encodeURIComponent(filePath)}`,
+    markdownUrl: `/api/local-image?path=${encodeURIComponent(filePath)}`,
   }
 }
 
@@ -2103,6 +2126,21 @@ function localImageImportPlugin(): PluginOption {
         } catch (error) {
           res.statusCode = 500
           sendJson(res, { error: error instanceof Error ? error.message : 'Could not backup notebook' })
+        }
+      })
+
+      server.middlewares.use('/api/notebook-image', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        try {
+          if (req.method !== 'POST') {
+            res.statusCode = 405
+            sendJson(res, { error: 'Method not allowed' })
+            return
+          }
+          const body = await readJsonBody(req, 32 * 1024 * 1024)
+          sendJson(res, saveNotebookImage(body))
+        } catch (error) {
+          res.statusCode = 400
+          sendJson(res, { error: error instanceof Error ? error.message : 'Could not save notebook image' })
         }
       })
 

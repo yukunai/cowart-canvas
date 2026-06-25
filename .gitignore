@@ -18,6 +18,9 @@ packages
 .playwright-cli
 codex-image-tasks
 video-tasks
+text-notes
+text-note-backups
+text-note-images
 *.local
 .env
 !.env.example

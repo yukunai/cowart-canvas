@@ -365,7 +365,7 @@
 
       .topbar {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 150px 116px auto auto auto auto auto;
+        grid-template-columns: minmax(0, 1fr) 150px 116px repeat(10, auto);
         gap: 10px;
         border-bottom: 1px solid #dce3eb;
         background: #ffffff;
@@ -380,10 +380,17 @@
       }
 
       .code-language-select,
-      .tag-input {
+      .tag-input,
+      .color-input {
         min-height: 34px;
         font-size: 12px;
         padding: 0 10px;
+      }
+
+      .color-input {
+        width: 42px;
+        min-width: 42px;
+        padding: 4px;
       }
 
       .tag-input {
@@ -556,6 +563,77 @@
         padding-left: 12px;
       }
 
+      .preview img {
+        display: block;
+        max-width: 100%;
+        max-height: 520px;
+        border: 1px solid #dce3eb;
+        border-radius: 8px;
+        object-fit: contain;
+      }
+
+      .image-popover {
+        position: fixed;
+        z-index: 30;
+        right: 24px;
+        top: 76px;
+        display: none;
+        width: min(420px, calc(100vw - 48px));
+        max-height: min(520px, calc(100vh - 120px));
+        overflow: auto;
+        border: 1px solid #d8e0e8;
+        border-radius: 12px;
+        background: #ffffff;
+        box-shadow: 0 20px 48px rgba(20, 36, 56, 0.18);
+        padding: 12px;
+      }
+
+      .image-popover.open {
+        display: grid;
+        gap: 10px;
+      }
+
+      .image-popover-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        color: #344054;
+        font-size: 13px;
+        font-weight: 760;
+      }
+
+      .image-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .image-choice {
+        display: grid;
+        gap: 5px;
+        min-height: 0;
+        border-radius: 8px;
+        padding: 6px;
+      }
+
+      .image-choice img {
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 6px;
+        background: #f3f6fa;
+        object-fit: cover;
+      }
+
+      .image-choice span {
+        overflow: hidden;
+        color: #526170;
+        font-size: 10px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       .empty {
         display: grid;
         place-items: center;
@@ -650,9 +728,14 @@
             <option value="markdown">Markdown</option>
             <option value="text">Text</option>
           </select>
+          <button type="button" class="editor-action" id="boldButton">B</button>
+          <input type="color" class="color-input" id="textColorInput" value="#ef4444" aria-label="文字颜色" />
+          <button type="button" class="editor-action" id="applyColorButton">颜色</button>
           <button type="button" class="editor-action" id="headingOneButton">H1</button>
           <button type="button" class="editor-action" id="headingTwoButton">H2</button>
           <button type="button" class="editor-action" id="insertCodeBlockButton">代码块</button>
+          <button type="button" class="editor-action" id="uploadNoteImageButton">上传图片</button>
+          <button type="button" class="editor-action" id="recentImageButton">最近生成</button>
           <button type="button" class="editor-action" id="copyMarkdownButton">复制全文</button>
           <button type="button" class="editor-action" id="exportButton">导出 Markdown</button>
         </header>
@@ -671,6 +754,14 @@
       <button type="button" id="togglePinNoteMenuItem">置顶</button>
       <button type="button" id="toggleFavoriteNoteMenuItem">收藏</button>
       <button type="button" class="danger" id="deleteNoteMenuItem">删除笔记</button>
+    </div>
+    <input type="file" id="noteImageInput" accept="image/*" hidden />
+    <div class="image-popover" id="recentImagePopover" role="dialog" aria-label="最近生成图片">
+      <div class="image-popover-header">
+        <span>最近生成</span>
+        <button type="button" class="subtle-action" id="closeRecentImagePopover">关闭</button>
+      </div>
+      <div class="image-grid" id="recentImageGrid"></div>
     </div>
 
     <script>
@@ -692,9 +783,14 @@
       const noteTagsInput = document.querySelector("#noteTagsInput");
       const noteContentInput = document.querySelector("#noteContentInput");
       const preview = document.querySelector("#preview");
+      const boldButton = document.querySelector("#boldButton");
+      const textColorInput = document.querySelector("#textColorInput");
+      const applyColorButton = document.querySelector("#applyColorButton");
       const headingOneButton = document.querySelector("#headingOneButton");
       const headingTwoButton = document.querySelector("#headingTwoButton");
       const insertCodeBlockButton = document.querySelector("#insertCodeBlockButton");
+      const uploadNoteImageButton = document.querySelector("#uploadNoteImageButton");
+      const recentImageButton = document.querySelector("#recentImageButton");
       const copyMarkdownButton = document.querySelector("#copyMarkdownButton");
       const exportButton = document.querySelector("#exportButton");
       const codeLanguageSelect = document.querySelector("#codeLanguageSelect");
@@ -707,6 +803,9 @@
       const newNoteTitleInput = document.querySelector("#newNoteTitleInput");
       const noteSearchInput = document.querySelector("#noteSearchInput");
       const backupNotebookButton = document.querySelector("#backupNotebookButton");
+      const noteImageInput = document.querySelector("#noteImageInput");
+      const recentImagePopover = document.querySelector("#recentImagePopover");
+      const recentImageGrid = document.querySelector("#recentImageGrid");
 
       function clamp(value, min, max) {
         return Math.min(max, Math.max(min, value));
@@ -945,13 +1044,17 @@
             const id = makeHeadingId(text);
             headings.push({ id, level: 2, text });
             html.push(`<h2 id="${escapeHtml(id)}">${inlineMarkdown(text)}</h2>`);
-          } else if (line.startsWith("# ")) {
-            const text = line.slice(2);
-            const id = makeHeadingId(text);
-            headings.push({ id, level: 1, text });
-            html.push(`<h1 id="${escapeHtml(id)}">${inlineMarkdown(text)}</h1>`);
-          }
-          else if (line.startsWith("> ")) html.push(`<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`);
+	          } else if (line.startsWith("# ")) {
+	            const text = line.slice(2);
+	            const id = makeHeadingId(text);
+	            headings.push({ id, level: 1, text });
+	            html.push(`<h1 id="${escapeHtml(id)}">${inlineMarkdown(text)}</h1>`);
+	          }
+	          else if (/^!\[[^\]]*\]\([^)]+\)\s*$/.test(line.trim())) {
+	            const match = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)\s*$/);
+	            html.push(`<p><img src="${escapeHtml(match?.[2] || "")}" alt="${escapeHtml(match?.[1] || "")}" loading="lazy" /></p>`);
+	          }
+	          else if (line.startsWith("> ")) html.push(`<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`);
           else if (line.trim() === "") html.push("");
           else html.push(`<p>${inlineMarkdown(line)}</p>`);
         }
@@ -968,6 +1071,7 @@
 
       function inlineMarkdown(value) {
         return escapeHtml(value)
+          .replace(/&lt;span style=&quot;color:\s*(#[0-9a-fA-F]{6})&quot;&gt;([\s\S]*?)&lt;\/span&gt;/g, '<span style="color:$1">$2</span>')
           .replace(/`([^`]+)`/g, "<code>$1</code>")
           .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
           .replace(/\*([^*]+)\*/g, "<em>$1</em>");
@@ -1092,6 +1196,9 @@
         noteTagsInput.disabled = disabled;
         noteContentInput.disabled = disabled;
         codeLanguageSelect.disabled = disabled;
+        boldButton.disabled = disabled;
+        textColorInput.disabled = disabled;
+        applyColorButton.disabled = disabled;
         headingOneButton.disabled = disabled;
         headingTwoButton.disabled = disabled;
         insertCodeBlockButton.disabled = disabled;
@@ -1328,6 +1435,113 @@
         updateActiveNote();
       }
 
+      function insertAtCursor(markdown) {
+        const note = activeNote();
+        if (!note) return;
+        const start = noteContentInput.selectionStart ?? noteContentInput.value.length;
+        const end = noteContentInput.selectionEnd ?? start;
+        const before = noteContentInput.value.slice(0, start);
+        const after = noteContentInput.value.slice(end);
+        const prefix = before && !before.endsWith("\n") ? "\n\n" : "";
+        const suffix = after && !after.startsWith("\n") ? "\n\n" : "";
+        noteContentInput.value = `${before}${prefix}${markdown}${suffix}${after}`;
+        const cursor = start + prefix.length + markdown.length;
+        noteContentInput.focus();
+        noteContentInput.setSelectionRange(cursor, cursor);
+        updateActiveNote();
+      }
+
+      function wrapSelection(prefix, suffix, placeholder = "文字") {
+        const note = activeNote();
+        if (!note) return;
+        const start = noteContentInput.selectionStart ?? noteContentInput.value.length;
+        const end = noteContentInput.selectionEnd ?? start;
+        const before = noteContentInput.value.slice(0, start);
+        const selected = noteContentInput.value.slice(start, end) || placeholder;
+        const after = noteContentInput.value.slice(end);
+        const next = `${prefix}${selected}${suffix}`;
+        noteContentInput.value = `${before}${next}${after}`;
+        const selectionStart = start + prefix.length;
+        const selectionEnd = selectionStart + selected.length;
+        noteContentInput.focus();
+        noteContentInput.setSelectionRange(selectionStart, selectionEnd);
+        updateActiveNote();
+      }
+
+      function applyBold() {
+        wrapSelection("**", "**", "加粗文字");
+      }
+
+      function applyTextColor() {
+        const color = /^#[0-9a-fA-F]{6}$/.test(textColorInput.value) ? textColorInput.value : "#ef4444";
+        wrapSelection(`<span style="color:${color}">`, "</span>", "彩色文字");
+      }
+
+      function fileToDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function uploadNoteImage(file) {
+        if (!file || !file.type.startsWith("image/")) return;
+        uploadNoteImageButton.disabled = true;
+        const originalText = uploadNoteImageButton.textContent;
+        uploadNoteImageButton.textContent = "上传中";
+        try {
+          const dataUrl = await fileToDataUrl(file);
+          const response = await fetch(`${apiBase}/api/notebook-image`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: file.name, dataUrl }),
+          });
+          const result = await response.json();
+          if (!response.ok || result.error) throw new Error(result.error || "上传图片失败");
+          insertAtCursor(`![${file.name.replace(/\.[^.]+$/, "")}](${result.markdownUrl})`);
+          uploadNoteImageButton.textContent = "已插入";
+        } catch (error) {
+          uploadNoteImageButton.textContent = "上传失败";
+        } finally {
+          window.setTimeout(() => {
+            uploadNoteImageButton.disabled = false;
+            uploadNoteImageButton.textContent = originalText;
+            noteImageInput.value = "";
+          }, 1200);
+        }
+      }
+
+      async function showRecentImages() {
+        recentImagePopover.classList.add("open");
+        recentImageGrid.innerHTML = "<div class='empty'>正在读取...</div>";
+        try {
+          const response = await fetch(`${apiBase}/api/recent-images`, { cache: "no-store" });
+          const result = await response.json();
+          if (!response.ok || result.error) throw new Error(result.error || "读取最近生成失败");
+          const images = Array.isArray(result.images) ? result.images.slice(0, 24) : [];
+          if (images.length === 0) {
+            recentImageGrid.innerHTML = "<div class='empty'>没有最近生成图片。</div>";
+            return;
+          }
+          recentImageGrid.innerHTML = "";
+          for (const image of images) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "image-choice";
+            button.innerHTML = `<img src="${escapeHtml(image.url)}" alt="" loading="lazy" /><span>${escapeHtml(image.name || "图片")}</span>`;
+            button.addEventListener("click", () => {
+              insertAtCursor(`![${image.name || "最近生成图片"}](${image.url})`);
+              recentImagePopover.classList.remove("open");
+            });
+            recentImageGrid.appendChild(button);
+          }
+        } catch {
+          recentImageGrid.innerHTML = "<div class='empty'>读取失败。</div>";
+        }
+      }
+
       function insertHeading(level) {
         const note = activeNote();
         if (!note) return;
@@ -1457,9 +1671,15 @@
         renderCategories();
       });
       backupNotebookButton.addEventListener("click", backupNotebook);
+      boldButton.addEventListener("click", applyBold);
+      applyColorButton.addEventListener("click", applyTextColor);
       headingOneButton.addEventListener("click", () => insertHeading(1));
       headingTwoButton.addEventListener("click", () => insertHeading(2));
       insertCodeBlockButton.addEventListener("click", insertCodeBlock);
+      uploadNoteImageButton.addEventListener("click", () => noteImageInput.click());
+      recentImageButton.addEventListener("click", showRecentImages);
+      document.querySelector("#closeRecentImagePopover").addEventListener("click", () => recentImagePopover.classList.remove("open"));
+      noteImageInput.addEventListener("change", () => uploadNoteImage(noteImageInput.files?.[0]));
       copyMarkdownButton.addEventListener("click", copyMarkdown);
       document.querySelector("#exportButton").addEventListener("click", exportMarkdown);
       preview.addEventListener("click", (event) => {
@@ -1469,6 +1689,12 @@
       noteTitleInput.addEventListener("input", updateActiveNote);
       noteTagsInput.addEventListener("input", updateActiveNote);
       noteContentInput.addEventListener("input", updateActiveNote);
+      noteContentInput.addEventListener("paste", (event) => {
+        const image = [...(event.clipboardData?.files || [])].find((file) => file.type.startsWith("image/"));
+        if (!image) return;
+        event.preventDefault();
+        uploadNoteImage(image);
+      });
       newNoteTitleInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") confirmAddNote();
         if (event.key === "Escape") hideAddNoteForm();
