@@ -951,6 +951,7 @@
       }
 
       async function saveNotebookToDisk() {
+        window.clearTimeout(saveTimer);
         const response = await fetch(`${apiBase}/api/notebook`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -961,6 +962,11 @@
         storagePath = next.storagePath || storagePath;
         hasLocalChanges = false;
         return next;
+      }
+
+      function flushNotebookSave() {
+        if (!hasLocalChanges) return;
+        saveNotebookToDisk().catch(() => {});
       }
 
       function activeCategory() {
@@ -1451,11 +1457,29 @@
           .slice(0, 12);
       }
 
+      function syncDefaultHeading(note, previousTitle, nextTitle) {
+        const oldHeading = `# ${previousTitle || "未命名笔记"}`;
+        const newHeading = `# ${nextTitle || "未命名笔记"}`;
+        if (note.content === oldHeading || note.content === `${oldHeading}\n` || note.content === `${oldHeading}\n\n`) {
+          note.content = `${newHeading}\n\n`;
+          return;
+        }
+        if (note.content.startsWith(`${oldHeading}\n`)) {
+          note.content = `${newHeading}${note.content.slice(oldHeading.length)}`;
+        }
+      }
+
       function updateActiveNote() {
         const note = activeNote();
         if (!note) return;
-        note.title = noteTitleInput.value;
+        const previousTitle = note.title || "未命名笔记";
+        const nextTitle = noteTitleInput.value.trim() || "未命名笔记";
         note.content = noteContentInput.value;
+        if (nextTitle !== previousTitle) {
+          syncDefaultHeading(note, previousTitle, nextTitle);
+          noteContentInput.value = note.content;
+        }
+        note.title = nextTitle;
         note.tags = parseTags(noteTagsInput.value);
         note.updatedAt = new Date().toISOString();
         preview.innerHTML = renderMarkdown(note.content);
@@ -1736,8 +1760,20 @@
         if (button) copyCodeBlock(button);
       });
       noteTitleInput.addEventListener("input", updateActiveNote);
+      noteTitleInput.addEventListener("change", flushNotebookSave);
+      noteTitleInput.addEventListener("blur", flushNotebookSave);
+      noteTitleInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          noteTitleInput.blur();
+        }
+      });
       noteTagsInput.addEventListener("input", updateActiveNote);
+      noteTagsInput.addEventListener("change", flushNotebookSave);
+      noteTagsInput.addEventListener("blur", flushNotebookSave);
       noteContentInput.addEventListener("input", updateActiveNote);
+      noteContentInput.addEventListener("change", flushNotebookSave);
+      noteContentInput.addEventListener("blur", flushNotebookSave);
       noteContentInput.addEventListener("paste", (event) => {
         const image = [...(event.clipboardData?.files || [])].find((file) => file.type.startsWith("image/"));
         if (!image) return;
@@ -1759,6 +1795,7 @@
           hideAddNoteForm();
         }
       });
+      window.addEventListener("beforeunload", flushNotebookSave);
       window.addEventListener("focus", () => loadNotebookFromDisk());
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") loadNotebookFromDisk();
