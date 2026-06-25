@@ -782,16 +782,28 @@
         localStorage.setItem(storageKey, JSON.stringify(data, null, 2));
       }
 
-      async function loadNotebookFromDisk() {
+      function isEditingText() {
+        return [noteTitleInput, noteTagsInput, noteContentInput, newNoteTitleInput].includes(document.activeElement);
+      }
+
+      async function loadNotebookFromDisk(options = {}) {
+        const { force = false, preserveSelection = true } = options;
+        if (!force && (hasLocalChanges || isEditingText())) return;
         try {
           const response = await fetch(`${apiBase}/api/notebook`, { cache: "no-store" });
           const next = await response.json();
           if (!response.ok || next.error) throw new Error(next.error || "读取文本失败");
-          if (hasLocalChanges) return;
+          const previousNoteId = activeNoteId;
           data = normalizeNotebook(next);
           storagePath = next.storagePath || "";
-          activeCategoryId = data.activeCategoryId || data.categories[0]?.id;
-          activeNoteId = data.activeNoteId || data.categories[0]?.notes[0]?.id;
+          if (preserveSelection && previousNoteId && noteById(previousNoteId)) {
+            activeNoteId = previousNoteId;
+            activeCategoryId = categoryForNote(previousNoteId)?.id || data.activeCategoryId || data.categories[0]?.id;
+          } else {
+            activeCategoryId = data.activeCategoryId || data.categories[0]?.id;
+            activeNoteId = data.activeNoteId || data.categories[0]?.notes[0]?.id;
+          }
+          hasLocalChanges = false;
           persistLocalBackup();
           renderAll();
         } catch (error) {
@@ -846,11 +858,18 @@
         const next = await response.json();
         if (!response.ok || next.error) throw new Error(next.error || "保存文本失败");
         storagePath = next.storagePath || storagePath;
+        hasLocalChanges = false;
         return next;
       }
 
       function activeCategory() {
         return data.categories.find((category) => category.id === activeCategoryId) || data.categories[0];
+      }
+
+      function selectNote(categoryId, noteId) {
+        activeCategoryId = categoryId;
+        activeNoteId = noteId;
+        renderAll();
       }
 
       function categoryById(id) {
@@ -1020,17 +1039,13 @@
             button.className = `item category-item ${category.id === activeCategoryId ? "active" : ""}`;
             button.innerHTML = `<strong>${escapeHtml(category.name)}</strong><span>${visibleNotes.length}/${category.notes.length} 篇</span>`;
             button.addEventListener("click", () => {
-              activeCategoryId = category.id;
-              activeNoteId = category.notes[0]?.id;
-              saveNotebook();
-              renderAll();
+              selectNote(category.id, category.notes[0]?.id);
             });
             button.addEventListener("contextmenu", (event) => {
               event.preventDefault();
               activeCategoryId = category.id;
               activeNoteId = category.notes[0]?.id;
               menuCategoryId = category.id;
-              saveNotebook();
               renderAll();
               showContextMenu(categoryMenu, event.clientX, event.clientY);
             });
@@ -1050,20 +1065,16 @@
               const meta = formatNoteMeta(note);
               noteButton.innerHTML = `<strong>${note.favorite ? "★ " : ""}${escapeHtml(note.title || "未命名笔记")}</strong><span>${new Date(note.updatedAt).toLocaleDateString()}</span>${meta ? `<div class="note-meta-line">${escapeHtml(meta)}</div>` : ""}`;
               noteButton.addEventListener("click", () => {
-                activeCategoryId = category.id;
-                activeNoteId = note.id;
-                saveNotebook();
-                renderAll();
+                selectNote(category.id, note.id);
               });
               noteButton.addEventListener("contextmenu", (event) => {
                 event.preventDefault();
                 activeCategoryId = category.id;
                 activeNoteId = note.id;
-	                menuNoteId = note.id;
-	                saveNotebook();
-	                renderAll();
-	                updateNoteMenuLabels(note);
-	                showContextMenu(noteMenu, event.clientX, event.clientY);
+		                menuNoteId = note.id;
+		                renderAll();
+		                updateNoteMenuLabels(note);
+		                showContextMenu(noteMenu, event.clientX, event.clientY);
 	              });
               noteListElement.appendChild(noteButton);
             }
@@ -1473,10 +1484,18 @@
           hideAddNoteForm();
         }
       });
+      window.addEventListener("focus", () => loadNotebookFromDisk());
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") loadNotebookFromDisk();
+      });
+      window.addEventListener("storage", (event) => {
+        if (event.key === storageKey) loadNotebookFromDisk({ force: true });
+      });
+      window.setInterval(() => loadNotebookFromDisk(), 5000);
 
       restorePaneWidths();
       renderAll();
-      loadNotebookFromDisk();
+      loadNotebookFromDisk({ force: true, preserveSelection: false });
     </script>
   </body>
 </html>
