@@ -751,6 +751,7 @@
       <button type="button" class="danger" id="deleteCategoryMenuItem">删除</button>
     </div>
     <div class="context-menu" id="noteMenu" role="menu">
+      <button type="button" id="renameNoteMenuItem">改名</button>
       <button type="button" id="togglePinNoteMenuItem">置顶</button>
       <button type="button" id="toggleFavoriteNoteMenuItem">收藏</button>
       <button type="button" class="danger" id="deleteNoteMenuItem">删除笔记</button>
@@ -775,6 +776,7 @@
       let menuCategoryId = "";
       let menuNoteId = "";
       let editingCategoryId = "";
+      let editingNoteId = "";
       let hasLocalChanges = false;
       let searchQuery = "";
 
@@ -882,7 +884,7 @@
       }
 
       function isEditingText() {
-        return [noteTitleInput, noteTagsInput, noteContentInput, newNoteTitleInput].includes(document.activeElement);
+        return [noteTitleInput, noteTagsInput, noteContentInput, newNoteTitleInput].includes(document.activeElement) || document.activeElement?.classList?.contains("inline-rename");
       }
 
       async function loadNotebookFromDisk(options = {}) {
@@ -1163,6 +1165,25 @@
               noteListElement.innerHTML = searchQuery ? "<div class='empty'>没有匹配的笔记。</div>" : "<div class='empty'>这个分类里还没有笔记。</div>";
             }
             for (const note of visibleNotes) {
+              if (editingNoteId === note.id) {
+                const input = document.createElement("input");
+                input.className = "inline-rename note-rename-input";
+                input.value = note.title || "未命名笔记";
+                input.addEventListener("keydown", (event) => {
+                  if (event.key === "Enter") input.blur();
+                  if (event.key === "Escape") {
+                    editingNoteId = "";
+                    renderCategories();
+                  }
+                });
+                input.addEventListener("blur", () => finishRenameNote(note, input.value));
+                noteListElement.appendChild(input);
+                setTimeout(() => {
+                  input.focus();
+                  input.select();
+                }, 0);
+                continue;
+              }
               const noteButton = document.createElement("button");
               noteButton.type = "button";
               noteButton.className = `note-tree-item ${note.id === activeNoteId ? "active" : ""}`;
@@ -1260,6 +1281,7 @@
         if (!category) return;
         hideCategoryMenu();
         editingCategoryId = category.id;
+        editingNoteId = "";
         renderCategories();
       }
 
@@ -1268,6 +1290,29 @@
         editingCategoryId = "";
         if (!name) return;
         category.name = name;
+        saveNotebook();
+        renderAll();
+      }
+
+      function renameNote(note = activeNote()) {
+        if (!note) return;
+        hideMenus();
+        editingCategoryId = "";
+        editingNoteId = note.id;
+        activeCategoryId = categoryForNote(note.id)?.id || activeCategoryId;
+        activeNoteId = note.id;
+        renderAll();
+      }
+
+      function finishRenameNote(note, value) {
+        const title = value.trim();
+        editingNoteId = "";
+        if (!title) {
+          renderCategories();
+          return;
+        }
+        note.title = title;
+        note.updatedAt = new Date().toISOString();
         saveNotebook();
         renderAll();
       }
@@ -1319,9 +1364,9 @@
         renderCategoryOptions();
         noteCreateCard.classList.add("open");
         noteCategorySelect.value = activeCategoryId || data.categories[0]?.id || "";
-        newNoteTitleInput.value = "新笔记";
-        newNoteTitleInput.focus();
-        newNoteTitleInput.select();
+        newNoteTitleInput.value = "";
+        newNoteTitleInput.placeholder = "笔记标题，留空则用“新笔记”";
+        setTimeout(() => newNoteTitleInput.focus(), 0);
       }
 
       function hideAddNoteForm() {
@@ -1663,6 +1708,7 @@
       document.querySelector("#showAddNoteButton").addEventListener("click", showAddNoteForm);
       document.querySelector("#confirmAddNoteButton").addEventListener("click", confirmAddNote);
       document.querySelector("#cancelAddNoteButton").addEventListener("click", hideAddNoteForm);
+      document.querySelector("#renameNoteMenuItem").addEventListener("click", () => renameNote(menuNote()));
       document.querySelector("#togglePinNoteMenuItem").addEventListener("click", () => togglePinNote(menuNote()));
       document.querySelector("#toggleFavoriteNoteMenuItem").addEventListener("click", () => toggleFavoriteNote(menuNote()));
       document.querySelector("#deleteNoteMenuItem").addEventListener("click", () => deleteNote(menuNote()));
