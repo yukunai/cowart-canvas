@@ -1791,16 +1791,16 @@ async function refreshVideoTask(id?: string) {
   if (!currentTask) throw new Error('读不到这个视频任务')
   if (!currentTask.taskId) throw new Error('这个任务还没有平台任务 ID')
 
-  if (currentTask.provider !== 'wanxiang') {
-    throw new Error(`暂时只支持自动查询阿里万象任务，${currentTask.providerName ?? '这个平台'} 需要手动刷新平台结果`)
-  }
-  if (!process.env.DASHSCOPE_API_KEY) throw new Error('缺少 DASHSCOPE_API_KEY，不能查询阿里万象任务')
+  if (currentTask.provider !== 'wanxiang') throw new Error(`暂时只支持自动查询阿里万象任务，${currentTask.providerName ?? '这个平台'} 需要手动刷新平台结果`)
+
+  const apiKey = process.env.DASHSCOPE_API_KEY
+  if (!apiKey) throw new Error('缺少 DASHSCOPE_API_KEY，不能查询阿里万象任务')
 
   const providerResponsePath = path.join(target.directory, 'provider-response.json')
   const previousResponse = readJsonFile(providerResponsePath)
   const previousPayload = isRecord(previousResponse) ? previousResponse.payload ?? previousResponse.previousPayload : undefined
   const providerResponse = await getProviderJson(buildDashScopeTaskEndpoint(currentTask.taskId), {
-    Authorization: `Bearer ${process.env.DASHSCOPE_API_KEY || ''}`,
+    Authorization: `Bearer ${apiKey}`,
   })
 
   writeJson(providerResponsePath, {
@@ -2799,10 +2799,10 @@ function localImageImportPlugin(): PluginOption {
             res.statusCode = 502
             sendJson(res, {
               error: `${providerRequest.providerName} 返回 ${providerResponse.status}`,
-            provider,
-            providerName: providerRequest.providerName,
-            directory,
-            imagePath,
+              provider,
+              providerName: providerRequest.providerName,
+              directory,
+              imagePath,
               requestPath,
               providerRequestPath,
               providerResponsePath,
