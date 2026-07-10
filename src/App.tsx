@@ -857,6 +857,7 @@ function App() {
   const [canvasLayerMap, setCanvasLayerMap] = useState<Record<string, CanvasImageLayer[]>>({})
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null)
   const [processingLayerImageId, setProcessingLayerImageId] = useState<string | null>(null)
+  const [isCanvasDropActive, setIsCanvasDropActive] = useState(false)
   const [imageSkillId, setImageSkillId] = useState<ImageGenerationSkillId>('strict-local-edit')
   const [prompt, setPrompt] = useState('')
   const [imageNegativePrompt, setImageNegativePrompt] = useState('')
@@ -939,6 +940,25 @@ function App() {
   const activeDimensions = activeImageKey ? imageDimensions[activeImageKey] : undefined
   const annotations = useMemo(() => (activeImageKey ? (annotationMap[activeImageKey] ?? []) : []), [activeImageKey, annotationMap])
   const canvasLayers = useMemo(() => (activeImageKey ? (canvasLayerMap[activeImageKey] ?? []) : []), [activeImageKey, canvasLayerMap])
+  const taskReferenceImages = useMemo(() => {
+    const seen = new Set<string>()
+    const references: Array<{ label: string; image: GeneratedImage }> = []
+    canvasLayers.forEach((layer, index) => {
+      const image = images.find((item) => item.id === layer.imageId)
+      if (!image || seen.has(image.id)) return
+      seen.add(image.id)
+      references.push({
+        label: tr(`主图图层 ${index + 1}`, `Main image layer ${index + 1}`),
+        image: { ...image, title: layer.title, src: layer.src },
+      })
+    })
+    filledCanvasReferences.forEach((item) => {
+      if (seen.has(item.image.id)) return
+      seen.add(item.image.id)
+      references.push({ label: getReferenceLabel(item.index, language), image: item.image })
+    })
+    return references
+  }, [canvasLayers, filledCanvasReferences, images, language, tr])
   const canvasZoomLabel = `${Math.round(canvasScale * 100)}%`
   const selectedVideoConfig = videoConfigProviders.find((provider) => provider.id === videoProvider)
   const imageCanvasStyle = activeDimensions
@@ -1140,8 +1160,8 @@ function App() {
       `生成策略：${selectedSkill.labelZh}\n策略要求：${selectedSkill.promptZh}`,
       `Generation strategy: ${selectedSkill.labelEn}\nStrategy requirement: ${selectedSkill.promptEn}`,
     )
-    const referenceNotes = filledCanvasReferences
-      .map((item, index) => tr(`${index + 1}. ${getReferenceLabel(item.index, 'zh')}：${item.image.title}`, `${index + 1}. ${getReferenceLabel(item.index, 'en')}: ${item.image.title}`))
+    const referenceNotes = taskReferenceImages
+      .map((item, index) => tr(`${index + 1}. ${item.label}：${item.image.title}`, `${index + 1}. ${item.label}: ${item.image.title}`))
       .join('\n')
     const layerNotes = canvasLayers
       .map((layer, index) => tr(
@@ -1151,7 +1171,7 @@ function App() {
       .join('\n')
     const extra = prompt.trim() ? tr(`\n补充说明：${prompt.trim()}`, `\nExtra notes: ${prompt.trim()}`) : ''
     const negative = imageNegativePrompt.trim() ? tr(`\n反向提示词：${imageNegativePrompt.trim()}`, `\nNegative prompt: ${imageNegativePrompt.trim()}`) : ''
-    if (annotations.length === 0 && filledCanvasReferences.length === 0 && canvasLayers.length === 0) {
+    if (annotations.length === 0 && taskReferenceImages.length === 0 && canvasLayers.length === 0) {
       return tr(`请基于这张图片继续改图：${activeImage.title}\n${skillText}\n还没有画布标注。${extra}${negative}`, `Continue editing this image: ${activeImage.title}\n${skillText}\nNo canvas annotations yet.${extra}${negative}`)
     }
     const notes = annotations
@@ -1166,7 +1186,7 @@ function App() {
       })
       .join('\n')
     const referenceText =
-      filledCanvasReferences.length > 0
+      taskReferenceImages.length > 0
         ? tr(
             `\n下方参考素材：\n${referenceNotes}\n请把这些素材作为任意产品、物件、局部元素或风格参考，自然融合进最终图片，不要机械拼贴。`,
             `\nReference materials below:\n${referenceNotes}\nUse these materials as products, objects, local elements, or style references. Blend them naturally into the final image instead of making a mechanical collage.`,
@@ -1179,13 +1199,13 @@ function App() {
         )
       : ''
     const annotationText = notes ? tr(`\n画布标注：\n${notes}`, `\nCanvas annotations:\n${notes}`) : tr('\n没有额外标注，主要根据下方参考素材完成融合。', '\nNo extra annotations. Mainly use the reference materials below for blending.')
-    const strictEditGuidance = getStrictImageEditGuidance(language, annotations, filledCanvasReferences.length > 0 || canvasLayers.length > 0)
+    const strictEditGuidance = getStrictImageEditGuidance(language, annotations, taskReferenceImages.length > 0 || canvasLayers.length > 0)
     const parameterText = tr(`\n改图参数：\n${strictEditGuidance}`, `\nEdit parameters:\n${strictEditGuidance}`)
     return tr(
       `请基于这张主图继续改图：${activeImage.title}\n保持主图主体、构图和质感。\n${skillText}${parameterText}${referenceText}${layerText}${extra}${negative}${annotationText}`,
       `Continue editing this main image: ${activeImage.title}\nKeep the main subject, composition, and texture.\n${skillText}${parameterText}${referenceText}${layerText}${extra}${negative}${annotationText}`,
     )
-  }, [activeImage, annotations, canvasLayers, filledCanvasReferences, imageNegativePrompt, imageSkillId, language, prompt, tr])
+  }, [activeImage, annotations, canvasLayers, imageNegativePrompt, imageSkillId, language, prompt, taskReferenceImages, tr])
 
   const importFiles = (fileList: FileList | File[]) => {
     const files = Array.from(fileList).filter((file) => file.type.startsWith('image/'))
@@ -1227,6 +1247,12 @@ function App() {
       return next
     })
     setCanvasReferences((current) => current.map((reference) => (reference.imageId === imageId ? { ...reference, imageId: undefined } : reference)))
+    setCanvasLayerMap((current) => Object.fromEntries(
+      Object.entries(current)
+        .filter(([mainImageId]) => mainImageId !== imageId)
+        .map(([mainImageId, layers]) => [mainImageId, layers.filter((layer) => layer.imageId !== imageId)]),
+    ))
+    setSelectedLayerId(null)
     removeVideoImage(imageId)
     if (activeImageId === imageId) {
       setActiveImageId(nextImages[0]?.id ?? null)
@@ -2141,6 +2167,7 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
+    setIsCanvasDropActive(false)
     const imageId = event.dataTransfer.getData('application/x-cowart-image-id') || event.dataTransfer.getData('text/plain')
     const image = images.find((item) => item.id === imageId)
     const imageCanvas = event.target instanceof Element ? event.target.closest('.image-canvas') : null
@@ -2172,10 +2199,7 @@ function App() {
         JSON.stringify(
           {
             image: activeImage,
-            references: filledCanvasReferences.map((item) => ({
-              label: getReferenceLabel(item.index, language),
-              image: item.image,
-            })),
+            references: taskReferenceImages,
             imageLayers: canvasLayers.map((layer) => ({ id: layer.id, imageId: layer.imageId, title: layer.title, x: layer.x, y: layer.y, width: layer.width, rotation: layer.rotation, opacity: layer.opacity, backgroundRemoved: layer.backgroundRemoved, zIndex: layer.zIndex })),
             annotations,
             skill: {
@@ -2262,7 +2286,7 @@ function App() {
       setStatus(tr('先放入一张要修改的图片', 'Place an image to edit first.'))
       return
     }
-    if (annotations.length === 0 && filledCanvasReferences.length === 0 && canvasLayers.length === 0) {
+    if (annotations.length === 0 && taskReferenceImages.length === 0 && canvasLayers.length === 0) {
       setStatus(tr('还没有画布标注或参考素材，先标出要改的地方，或把素材图放到下方槽里', 'No canvas annotations or reference materials yet. Mark the areas to edit, or drop reference images into the slots below.'))
       return
     }
@@ -2275,7 +2299,7 @@ function App() {
       if (!imageBlob.type.startsWith('image/')) throw new Error('当前文件不是图片')
       const imageDataUrl = await blobToDataUrl(imageBlob)
       const referenceImageDataUrls = await Promise.all(
-        filledCanvasReferences.map(async (item) => {
+        taskReferenceImages.map(async (item) => {
           const referenceResponse = await fetch(item.image.src)
           if (!referenceResponse.ok) throw new Error(`读不到参考素材：${item.image.title}`)
           const referenceBlob = await referenceResponse.blob()
@@ -2288,10 +2312,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image: activeImage,
-          references: filledCanvasReferences.map((item) => ({
-            label: getReferenceLabel(item.index, language),
-            image: item.image,
-          })),
+          references: taskReferenceImages,
           imageLayers: canvasLayers.map((layer) => ({ id: layer.id, imageId: layer.imageId, title: layer.title, x: layer.x, y: layer.y, width: layer.width, rotation: layer.rotation, opacity: layer.opacity, backgroundRemoved: layer.backgroundRemoved, zIndex: layer.zIndex })),
           annotations,
           editPrompt,
@@ -2305,7 +2326,7 @@ function App() {
 
       try {
         await navigator.clipboard.writeText(task.codexInstruction)
-        setStatus(tr(`已保存任务并复制给 Codex 的生成指令。把剪贴板内容粘贴到左边聊天，我就能按标注和 ${filledCanvasReferences.length} 张素材重新生成。`, `Saved the task and copied the Codex instruction. Paste the clipboard into the chat on the left, and I can regenerate from the annotations and ${filledCanvasReferences.length} reference image${filledCanvasReferences.length > 1 ? 's' : ''}.`))
+        setStatus(tr(`已保存任务并复制给 Codex 的生成指令。把剪贴板内容粘贴到左边聊天，我就能按标注和 ${taskReferenceImages.length} 张素材重新生成。`, `Saved the task and copied the Codex instruction. Paste the clipboard into the chat on the left, and I can regenerate from the annotations and ${taskReferenceImages.length} reference image${taskReferenceImages.length > 1 ? 's' : ''}.`))
       } catch {
         setStatus(tr(`已保存任务，但浏览器没允许复制。生成指令在：${task.codexInstructionPath}`, `Saved the task, but the browser did not allow copying. The generation instruction is at: ${task.codexInstructionPath}`))
       }
@@ -3161,10 +3182,21 @@ function App() {
             {activeImage ? (
               <div className={`composition-canvas ${hasReferenceCanvas ? 'has-reference-slots' : ''}`}>
                 <div
-                  className={`image-canvas ${isImageScaleDragging ? 'show-resize-handles' : ''}`}
+                  className={`image-canvas ${isImageScaleDragging ? 'show-resize-handles' : ''} ${isCanvasDropActive ? 'canvas-drop-active' : ''}`}
                   style={imageCanvasStyle}
                   draggable={false}
                   onDragStart={(event) => event.preventDefault()}
+                  onDragEnter={(event) => {
+                    event.preventDefault()
+                    if (Array.from(event.dataTransfer.types).includes('application/x-cowart-image-id')) setIsCanvasDropActive(true)
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'copy'
+                  }}
+                  onDragLeave={(event) => {
+                    if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setIsCanvasDropActive(false)
+                  }}
                   onPointerDown={startAnnotation}
                   onPointerMove={moveAnnotation}
                   onPointerUp={finishAnnotation}
@@ -3176,6 +3208,7 @@ function App() {
                     draggable={false}
                     onLoad={(event) => recordImageDimensions(activeImage.id, event.currentTarget)}
                   />
+                  {isCanvasDropActive ? <div className="canvas-drop-hint">{tr('松手放入主图', 'Drop onto main image')}</div> : null}
                   {canvasLayers.map((layer) => {
                     const isSelected = selectedLayerId === layer.id
                     return (
