@@ -1790,16 +1790,17 @@ async function refreshVideoTask(id?: string) {
   const currentTask = summarizeVideoTask(target.directory, target.directoryName)
   if (!currentTask) throw new Error('读不到这个视频任务')
   if (!currentTask.taskId) throw new Error('这个任务还没有平台任务 ID')
-  if (currentTask.provider !== 'wanxiang') throw new Error(`暂时只支持自动查询阿里万象任务，${currentTask.providerName ?? '这个平台'} 需要手动刷新平台结果`)
 
-  const apiKey = process.env.DASHSCOPE_API_KEY
-  if (!apiKey) throw new Error('缺少 DASHSCOPE_API_KEY，不能查询阿里万象任务')
+  if (currentTask.provider !== 'wanxiang') {
+    throw new Error(`暂时只支持自动查询阿里万象任务，${currentTask.providerName ?? '这个平台'} 需要手动刷新平台结果`)
+  }
+  if (!process.env.DASHSCOPE_API_KEY) throw new Error('缺少 DASHSCOPE_API_KEY，不能查询阿里万象任务')
 
   const providerResponsePath = path.join(target.directory, 'provider-response.json')
   const previousResponse = readJsonFile(providerResponsePath)
   const previousPayload = isRecord(previousResponse) ? previousResponse.payload ?? previousResponse.previousPayload : undefined
   const providerResponse = await getProviderJson(buildDashScopeTaskEndpoint(currentTask.taskId), {
-    Authorization: `Bearer ${apiKey}`,
+    Authorization: `Bearer ${process.env.DASHSCOPE_API_KEY || ''}`,
   })
 
   writeJson(providerResponsePath, {
@@ -1900,7 +1901,7 @@ function recentImageName(filePath: string, fileName: string) {
   if (filePath.includes('/.codex/generated_images/')) {
     const extension = path.extname(fileName)
     const parentName = path.basename(path.dirname(filePath)).slice(0, 8)
-    const fileStem = path.basename(fileName, extension).replace(/^ig_/, '').slice(0, 8)
+    const fileStem = path.basename(fileName, extension).replace(/^(?:ig_|exec-)/, '').slice(0, 8)
     return `codex-${parentName}-${fileStem}${extension}`
   }
 
@@ -1921,7 +1922,7 @@ function isCodexGeneratedRecentImage(filePath: string, fileName: string) {
   const codexGeneratedRoot = path.join(os.homedir(), '.codex', 'generated_images').split(path.sep).join('/')
   const localTaskRoot = path.join(process.cwd(), 'codex-image-tasks').split(path.sep).join('/')
 
-  if (normalizedPath.startsWith(`${codexGeneratedRoot}/`)) return /^ig_[a-f0-9]+/i.test(fileName)
+  if (normalizedPath.startsWith(`${codexGeneratedRoot}/`)) return /^(?:ig_[a-f0-9]+|exec-[a-f0-9-]+)\.(?:png|jpe?g|webp)$/i.test(fileName)
 
   if (!normalizedPath.startsWith(`${localTaskRoot}/`)) return false
   if (/^(source|reference-\d+)\.(png|jpe?g|webp|gif|svg)$/i.test(fileName)) return false
@@ -2798,10 +2799,10 @@ function localImageImportPlugin(): PluginOption {
             res.statusCode = 502
             sendJson(res, {
               error: `${providerRequest.providerName} 返回 ${providerResponse.status}`,
-              provider,
-              providerName: providerRequest.providerName,
-              directory,
-              imagePath,
+            provider,
+            providerName: providerRequest.providerName,
+            directory,
+            imagePath,
               requestPath,
               providerRequestPath,
               providerResponsePath,

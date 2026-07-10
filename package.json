@@ -15,6 +15,7 @@
     "uninstall:mac": "scripts/uninstall-cowart-canvas-launch-agent.sh",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:recent-images": "node scripts/test-recent-images.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
