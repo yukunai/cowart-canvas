@@ -1503,15 +1503,15 @@ textarea {
   top: 25px;
   bottom: auto;
   display: grid;
-  width: 14px;
-  height: 14px;
-  min-height: 14px;
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
   place-items: center;
   border: 1px solid rgba(75, 85, 99, 0.45);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.72);
   cursor: nwse-resize;
-  opacity: 0.16;
+  opacity: 0.08;
   padding: 0;
   transition:
     opacity 140ms ease,
@@ -1527,8 +1527,8 @@ textarea {
 }
 
 .reference-slot-resize::before {
-  width: 6px;
-  height: 6px;
+  width: 9px;
+  height: 9px;
   border-right: 1.5px solid #64748b;
   border-bottom: 1.5px solid #64748b;
   content: '';

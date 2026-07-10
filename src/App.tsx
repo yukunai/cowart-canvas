@@ -116,7 +116,7 @@ const maxVideoImages = 5
 const maxCanvasReferenceImages = 3
 const defaultReferenceSlotSize = 64
 const minReferenceSlotSize = 52
-const maxReferenceSlotSize = 110
+const maxReferenceSlotSize = 360
 const imageGenerationSkills = [
   {
     id: 'strict-local-edit',
@@ -575,7 +575,7 @@ function loadBrowserImage(src: string) {
 
 async function removeConnectedSolidBackground(src: string) {
   const image = await loadBrowserImage(src)
-  const maxDimension = 1600
+  const maxDimension = 1100
   const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
   const width = Math.max(1, Math.round(image.naturalWidth * scale))
   const height = Math.max(1, Math.round(image.naturalHeight * scale))
@@ -599,12 +599,19 @@ async function removeConnectedSolidBackground(src: string) {
   const queue = new Int32Array(width * height)
   let head = 0
   let tail = 0
-  const colorDistance = (index: number) => {
+  const colorDistanceSquared = (index: number) => {
     const offset = index * 4
-    return Math.hypot(pixels[offset] - background[0], pixels[offset + 1] - background[1], pixels[offset + 2] - background[2])
+    const red = pixels[offset] - background[0]
+    const green = pixels[offset + 1] - background[1]
+    const blue = pixels[offset + 2] - background[2]
+    return red * red + green * green + blue * blue
   }
   const enqueue = (index: number) => {
-    if (visited[index] || colorDistance(index) > 92) return
+    if (visited[index]) return
+    if (colorDistanceSquared(index) > 92 * 92) {
+      visited[index] = 2
+      return
+    }
     visited[index] = 1
     queue[tail++] = index
   }
@@ -626,8 +633,8 @@ async function removeConnectedSolidBackground(src: string) {
     if (y < height - 1) enqueue(index + width)
   }
   for (let index = 0; index < visited.length; index += 1) {
-    if (!visited[index]) continue
-    const distance = colorDistance(index)
+    if (visited[index] !== 1) continue
+    const distance = Math.sqrt(colorDistanceSquared(index))
     pixels[index * 4 + 3] = distance <= 48 ? 0 : Math.round(255 * Math.min(1, (distance - 48) / 44))
   }
   context.putImageData(imageData, 0, 0)
@@ -1016,7 +1023,7 @@ function App() {
     }))
   }, [activeImageKey])
 
-  const addImageLayer = useCallback(async (image: GeneratedImage, makeTransparent: boolean) => {
+  const addImageLayer = useCallback(async (image: GeneratedImage, makeTransparent: boolean, position?: { x: number; y: number }) => {
     if (!activeImageKey) {
       setStatus(tr('先把一张主图放到画布上', 'Place a main image on the canvas first.'))
       return
@@ -1030,8 +1037,8 @@ function App() {
         title: image.title,
         src,
         originalSrc: image.src,
-        x: 50,
-        y: 50,
+        x: position?.x ?? 50,
+        y: position?.y ?? 50,
         width: 28,
         rotation: 0,
         opacity: 1,
@@ -1807,7 +1814,7 @@ function App() {
     }
 
     const handleNativeDrop = (event: DragEvent) => {
-      if (isReferenceSlotEventTarget(event.target)) {
+      if (event.target instanceof Element && event.target.closest('.image-edit-app')) {
         setIsWindowDragging(false)
         return
       }
@@ -2134,6 +2141,18 @@ function App() {
 
     event.preventDefault()
     event.stopPropagation()
+    const imageId = event.dataTransfer.getData('application/x-cowart-image-id') || event.dataTransfer.getData('text/plain')
+    const image = images.find((item) => item.id === imageId)
+    const imageCanvas = event.target instanceof Element ? event.target.closest('.image-canvas') : null
+    if (activeImage && image && image.id !== activeImage.id && imageCanvas) {
+      const bounds = imageCanvas.getBoundingClientRect()
+      const position = {
+        x: Math.min(100, Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100)),
+        y: Math.min(100, Math.max(0, ((event.clientY - bounds.top) / bounds.height) * 100)),
+      }
+      void addImageLayer(image, false, position)
+      return
+    }
     void importDataTransfer(event.dataTransfer)
   }
 
