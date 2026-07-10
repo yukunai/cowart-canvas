@@ -1459,7 +1459,7 @@ textarea {
   bottom: 3px;
   left: 3px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 2px;
   opacity: 0;
   pointer-events: none;
@@ -1479,19 +1479,29 @@ textarea {
   border-radius: 4px;
   background: rgba(220, 38, 38, 0.92);
   color: #fff;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 800;
   padding: 0 2px;
+}
+
+.reference-slot-actions button:nth-child(2) {
+  background: rgba(15, 118, 110, 0.94);
 }
 
 .reference-slot-actions button:last-child {
   background: rgba(79, 70, 229, 0.94);
 }
 
+.reference-slot-actions button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .reference-slot-resize {
   position: absolute;
   right: 3px;
-  bottom: 3px;
+  top: 25px;
+  bottom: auto;
   display: grid;
   width: 14px;
   height: 14px;
@@ -1648,9 +1658,172 @@ textarea {
   object-fit: contain;
 }
 
+.canvas-image-layer {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.canvas-image-layer-visual {
+  position: relative;
+  width: 100%;
+  transform-origin: center;
+  filter: drop-shadow(0 5px 9px rgba(15, 23, 42, 0.16));
+  transition: filter 120ms ease;
+}
+
+.canvas-image-layer.selected .canvas-image-layer-visual {
+  filter:
+    drop-shadow(0 5px 9px rgba(15, 23, 42, 0.16))
+    drop-shadow(0 0 1px rgba(31, 111, 235, 0.95));
+}
+
+.canvas-image-layer-visual > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.canvas-layer-toolbar {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: max-content;
+  border: 1px solid #cad4e0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 22px rgba(20, 31, 44, 0.18);
+  padding: 4px;
+  transform: translateX(-50%);
+}
+
+.canvas-layer-toolbar button {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  min-height: 27px;
+  place-items: center;
+  border-radius: 6px;
+  padding: 0;
+}
+
+.canvas-layer-toolbar button.active {
+  border-color: #0f766e;
+  background: #e5f7f3;
+  color: #0f766e;
+}
+
+.canvas-layer-toolbar button.danger {
+  color: #c92a2a;
+}
+
+.canvas-layer-toolbar label {
+  display: flex;
+  height: 27px;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #d5dde7;
+  border-radius: 6px;
+  color: #4d5c6c;
+  padding: 0 6px;
+}
+
+.canvas-layer-toolbar input[type='range'] {
+  width: 58px;
+  accent-color: #1f6feb;
+}
+
+.canvas-layer-resize {
+  position: absolute;
+  z-index: 4;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: nwse-resize;
+  opacity: 0;
+  padding: 0;
+  transition: opacity 120ms ease;
+  touch-action: none;
+}
+
+.canvas-image-layer:hover .canvas-layer-resize,
+.canvas-image-layer.selected .canvas-layer-resize {
+  opacity: 0.55;
+}
+
+.canvas-layer-resize:hover,
+.canvas-layer-resize:focus-visible {
+  opacity: 1 !important;
+}
+
+.canvas-layer-resize::before {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: rgba(31, 111, 235, 0.84);
+  border-style: solid;
+  content: '';
+}
+
+.canvas-layer-resize-top-left {
+  top: -8px;
+  left: -8px;
+}
+
+.canvas-layer-resize-top-left::before {
+  top: 5px;
+  left: 5px;
+  border-width: 1.5px 0 0 1.5px;
+}
+
+.canvas-layer-resize-top-right {
+  top: -8px;
+  right: -8px;
+  cursor: nesw-resize;
+}
+
+.canvas-layer-resize-top-right::before {
+  top: 5px;
+  right: 5px;
+  border-width: 1.5px 1.5px 0 0;
+}
+
+.canvas-layer-resize-bottom-left {
+  bottom: -8px;
+  left: -8px;
+  cursor: nesw-resize;
+}
+
+.canvas-layer-resize-bottom-left::before {
+  bottom: 5px;
+  left: 5px;
+  border-width: 0 0 1.5px 1.5px;
+}
+
+.canvas-layer-resize-bottom-right {
+  right: -8px;
+  bottom: -8px;
+}
+
+.canvas-layer-resize-bottom-right::before {
+  right: 5px;
+  bottom: 5px;
+  border-width: 0 1.5px 1.5px 0;
+}
+
 .image-scale-handle {
   position: absolute;
-  z-index: 8;
+  z-index: 110;
   width: 22px;
   height: 22px;
   min-height: 22px;
@@ -1742,7 +1915,7 @@ textarea {
 .drawing-layer {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 100;
   width: 100%;
   height: 100%;
   overflow: visible;
@@ -1767,7 +1940,7 @@ textarea {
 .annotation-control {
   --annotation-color: #df2020;
   position: absolute;
-  z-index: 3;
+  z-index: 101;
   display: flex;
   align-items: center;
   gap: 8px;

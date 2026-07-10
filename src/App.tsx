@@ -7,8 +7,10 @@ import type {
 import {
   ArrowRight,
   ArrowUpRight,
+  BringToFront,
   Circle as CircleIcon,
   Download,
+  Eraser,
   Globe2,
   ImagePlus,
   MapPin,
@@ -16,7 +18,10 @@ import {
   PencilLine,
   Plus,
   RefreshCcw,
+  RotateCcw,
+  RotateCw,
   Send,
+  SendToBack,
   SlidersHorizontal,
   Trash2,
   Type,
@@ -286,6 +291,21 @@ type CanvasReference = {
   imageId?: string
 }
 
+type CanvasImageLayer = {
+  id: string
+  imageId: string
+  title: string
+  src: string
+  originalSrc: string
+  x: number
+  y: number
+  width: number
+  rotation: number
+  opacity: number
+  backgroundRemoved: boolean
+  zIndex: number
+}
+
 function createCanvasReference(index: number): CanvasReference {
   return { id: `reference-${index + 1}`, label: `reference-${index + 1}` }
 }
@@ -544,6 +564,76 @@ function isReferenceSlotEventTarget(target: EventTarget | null) {
   return target instanceof Element && Boolean(target.closest('.reference-slot'))
 }
 
+function loadBrowserImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('Could not load image'))
+    image.src = src
+  })
+}
+
+async function removeConnectedSolidBackground(src: string) {
+  const image = await loadBrowserImage(src)
+  const maxDimension = 1600
+  const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
+  const width = Math.max(1, Math.round(image.naturalWidth * scale))
+  const height = Math.max(1, Math.round(image.naturalHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (!context) throw new Error('Could not create image canvas')
+  context.drawImage(image, 0, 0, width, height)
+  const imageData = context.getImageData(0, 0, width, height)
+  const pixels = imageData.data
+  const cornerIndexes = [0, width - 1, (height - 1) * width, height * width - 1]
+  const background = cornerIndexes.reduce(
+    (sum, index) => {
+      const offset = index * 4
+      return [sum[0] + pixels[offset], sum[1] + pixels[offset + 1], sum[2] + pixels[offset + 2]]
+    },
+    [0, 0, 0],
+  ).map((value) => value / cornerIndexes.length)
+  const visited = new Uint8Array(width * height)
+  const queue = new Int32Array(width * height)
+  let head = 0
+  let tail = 0
+  const colorDistance = (index: number) => {
+    const offset = index * 4
+    return Math.hypot(pixels[offset] - background[0], pixels[offset + 1] - background[1], pixels[offset + 2] - background[2])
+  }
+  const enqueue = (index: number) => {
+    if (visited[index] || colorDistance(index) > 92) return
+    visited[index] = 1
+    queue[tail++] = index
+  }
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x)
+    enqueue((height - 1) * width + x)
+  }
+  for (let y = 1; y < height - 1; y += 1) {
+    enqueue(y * width)
+    enqueue(y * width + width - 1)
+  }
+  while (head < tail) {
+    const index = queue[head++]
+    const x = index % width
+    const y = Math.floor(index / width)
+    if (x > 0) enqueue(index - 1)
+    if (x < width - 1) enqueue(index + 1)
+    if (y > 0) enqueue(index - width)
+    if (y < height - 1) enqueue(index + width)
+  }
+  for (let index = 0; index < visited.length; index += 1) {
+    if (!visited[index]) continue
+    const distance = colorDistance(index)
+    pixels[index * 4 + 3] = distance <= 48 ? 0 : Math.round(255 * Math.min(1, (distance - 48) / 44))
+  }
+  context.putImageData(imageData, 0, 0)
+  return canvas.toDataURL('image/png')
+}
+
 function blobToDataUrl(blob: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -757,6 +847,9 @@ function App() {
     () => Array.from({ length: maxCanvasReferenceImages }, (_, index) => createCanvasReference(index)),
   )
   const [referenceSlotSizes, setReferenceSlotSizes] = useState<number[]>(() => Array.from({ length: maxCanvasReferenceImages }, () => defaultReferenceSlotSize))
+  const [canvasLayerMap, setCanvasLayerMap] = useState<Record<string, CanvasImageLayer[]>>({})
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null)
+  const [processingLayerImageId, setProcessingLayerImageId] = useState<string | null>(null)
   const [imageSkillId, setImageSkillId] = useState<ImageGenerationSkillId>('strict-local-edit')
   const [prompt, setPrompt] = useState('')
   const [imageNegativePrompt, setImageNegativePrompt] = useState('')
@@ -838,6 +931,7 @@ function App() {
   const activeImageKey = activeImage?.id ?? ''
   const activeDimensions = activeImageKey ? imageDimensions[activeImageKey] : undefined
   const annotations = useMemo(() => (activeImageKey ? (annotationMap[activeImageKey] ?? []) : []), [activeImageKey, annotationMap])
+  const canvasLayers = useMemo(() => (activeImageKey ? (canvasLayerMap[activeImageKey] ?? []) : []), [activeImageKey, canvasLayerMap])
   const canvasZoomLabel = `${Math.round(canvasScale * 100)}%`
   const selectedVideoConfig = videoConfigProviders.find((provider) => provider.id === videoProvider)
   const imageCanvasStyle = activeDimensions
@@ -914,6 +1008,74 @@ function App() {
     [fillCanvasReferenceSlots, images, tr],
   )
 
+  const updateCanvasLayer = useCallback((layerId: string, update: Partial<CanvasImageLayer>) => {
+    if (!activeImageKey) return
+    setCanvasLayerMap((current) => ({
+      ...current,
+      [activeImageKey]: (current[activeImageKey] ?? []).map((layer) => (layer.id === layerId ? { ...layer, ...update } : layer)),
+    }))
+  }, [activeImageKey])
+
+  const addImageLayer = useCallback(async (image: GeneratedImage, makeTransparent: boolean) => {
+    if (!activeImageKey) {
+      setStatus(tr('先把一张主图放到画布上', 'Place a main image on the canvas first.'))
+      return
+    }
+    try {
+      setProcessingLayerImageId(image.id)
+      const src = makeTransparent ? await removeConnectedSolidBackground(image.src) : image.src
+      const layer: CanvasImageLayer = {
+        id: `layer-${Date.now()}-${image.id}`,
+        imageId: image.id,
+        title: image.title,
+        src,
+        originalSrc: image.src,
+        x: 50,
+        y: 50,
+        width: 28,
+        rotation: 0,
+        opacity: 1,
+        backgroundRemoved: makeTransparent,
+        zIndex: (canvasLayerMap[activeImageKey] ?? []).length + 1,
+      }
+      setCanvasLayerMap((current) => ({ ...current, [activeImageKey]: [...(current[activeImageKey] ?? []), layer] }))
+      setSelectedLayerId(layer.id)
+      setActiveTool('select')
+      setStatus(makeTransparent
+        ? tr(`已去除「${image.title}」的纯色背景并放入主图`, `Removed the solid background from "${image.title}" and placed it on the main image.`)
+        : tr(`已把「${image.title}」作为图层放入主图`, `Placed "${image.title}" on the main image as a layer.`))
+    } catch {
+      setStatus(tr('透明化失败，可先用“放入”保留原背景，或换一张白底/纯色底图片', 'Background removal failed. Use Place to keep the original background, or try a white/solid-background image.'))
+    } finally {
+      setProcessingLayerImageId(null)
+    }
+  }, [activeImageKey, canvasLayerMap, tr])
+
+  const toggleLayerBackground = useCallback(async (layer: CanvasImageLayer) => {
+    try {
+      setProcessingLayerImageId(layer.imageId)
+      if (layer.backgroundRemoved) {
+        updateCanvasLayer(layer.id, { src: layer.originalSrc, backgroundRemoved: false })
+        setStatus(tr('已恢复素材原背景', 'Restored the original background.'))
+      } else {
+        const src = await removeConnectedSolidBackground(layer.originalSrc)
+        updateCanvasLayer(layer.id, { src, backgroundRemoved: true })
+        setStatus(tr('已去除素材的白底/纯色背景', 'Removed the white/solid background.'))
+      }
+    } catch {
+      setStatus(tr('没有识别到可去除的纯色背景', 'No removable solid background was detected.'))
+    } finally {
+      setProcessingLayerImageId(null)
+    }
+  }, [tr, updateCanvasLayer])
+
+  const removeCanvasLayer = useCallback((layerId: string) => {
+    if (!activeImageKey) return
+    setCanvasLayerMap((current) => ({ ...current, [activeImageKey]: (current[activeImageKey] ?? []).filter((layer) => layer.id !== layerId) }))
+    setSelectedLayerId((current) => (current === layerId ? null : current))
+    setStatus(tr('已从主图移除素材图层', 'Removed the image layer from the main image.'))
+  }, [activeImageKey, tr])
+
   const addReferenceFiles = useCallback(
     (files: File[], targetSlotIndex?: number) => {
       const imageFiles = files.filter((file) => file.type.startsWith('image/'))
@@ -958,6 +1120,7 @@ function App() {
       return
     }
     setActiveImageId(imported[0].id)
+    setSelectedLayerId(null)
     if (isVideoPanelOpen) addVideoImages(imported.map((image) => image.id))
     setZoomMode('fit')
     setStatus(isVideoPanelOpen ? tr(`已导入 ${imported.length} 张图片，并加入视频参考图`, `Imported ${imported.length} image${imported.length > 1 ? 's' : ''} and added them to video references.`) : tr(`已导入 ${imported.length} 张图片，可以直接在画布上标注`, `Imported ${imported.length} image${imported.length > 1 ? 's' : ''}. You can mark them on the canvas now.`))
@@ -973,9 +1136,15 @@ function App() {
     const referenceNotes = filledCanvasReferences
       .map((item, index) => tr(`${index + 1}. ${getReferenceLabel(item.index, 'zh')}：${item.image.title}`, `${index + 1}. ${getReferenceLabel(item.index, 'en')}: ${item.image.title}`))
       .join('\n')
+    const layerNotes = canvasLayers
+      .map((layer, index) => tr(
+        `${index + 1}. ${layer.title}：中心约 ${Math.round(layer.x)}%, ${Math.round(layer.y)}%，宽约主图 ${Math.round(layer.width)}%，旋转 ${Math.round(layer.rotation)}°，透明度 ${Math.round(layer.opacity * 100)}%${layer.backgroundRemoved ? '，已去除原背景' : ''}`,
+        `${index + 1}. ${layer.title}: centered around ${Math.round(layer.x)}%, ${Math.round(layer.y)}%, about ${Math.round(layer.width)}% of the main image width, rotated ${Math.round(layer.rotation)}°, opacity ${Math.round(layer.opacity * 100)}%${layer.backgroundRemoved ? ', original background removed' : ''}`,
+      ))
+      .join('\n')
     const extra = prompt.trim() ? tr(`\n补充说明：${prompt.trim()}`, `\nExtra notes: ${prompt.trim()}`) : ''
     const negative = imageNegativePrompt.trim() ? tr(`\n反向提示词：${imageNegativePrompt.trim()}`, `\nNegative prompt: ${imageNegativePrompt.trim()}`) : ''
-    if (annotations.length === 0 && filledCanvasReferences.length === 0) {
+    if (annotations.length === 0 && filledCanvasReferences.length === 0 && canvasLayers.length === 0) {
       return tr(`请基于这张图片继续改图：${activeImage.title}\n${skillText}\n还没有画布标注。${extra}${negative}`, `Continue editing this image: ${activeImage.title}\n${skillText}\nNo canvas annotations yet.${extra}${negative}`)
     }
     const notes = annotations
@@ -996,14 +1165,20 @@ function App() {
             `\nReference materials below:\n${referenceNotes}\nUse these materials as products, objects, local elements, or style references. Blend them naturally into the final image instead of making a mechanical collage.`,
           )
         : ''
+    const layerText = layerNotes
+      ? tr(
+          `\n主图上的素材图层排版：\n${layerNotes}\n请按这里记录的位置、大小、角度和透明度理解用户的构图意图，并把素材自然融合成真实画面，不要保留生硬贴图边缘。`,
+          `\nMaterial layer layout on the main image:\n${layerNotes}\nUse the recorded position, size, angle, and opacity as the user's composition intent. Blend the materials into a realistic final image without hard pasted edges.`,
+        )
+      : ''
     const annotationText = notes ? tr(`\n画布标注：\n${notes}`, `\nCanvas annotations:\n${notes}`) : tr('\n没有额外标注，主要根据下方参考素材完成融合。', '\nNo extra annotations. Mainly use the reference materials below for blending.')
-    const strictEditGuidance = getStrictImageEditGuidance(language, annotations, filledCanvasReferences.length > 0)
+    const strictEditGuidance = getStrictImageEditGuidance(language, annotations, filledCanvasReferences.length > 0 || canvasLayers.length > 0)
     const parameterText = tr(`\n改图参数：\n${strictEditGuidance}`, `\nEdit parameters:\n${strictEditGuidance}`)
     return tr(
-      `请基于这张主图继续改图：${activeImage.title}\n保持主图主体、构图和质感。\n${skillText}${parameterText}${referenceText}${extra}${negative}${annotationText}`,
-      `Continue editing this main image: ${activeImage.title}\nKeep the main subject, composition, and texture.\n${skillText}${parameterText}${referenceText}${extra}${negative}${annotationText}`,
+      `请基于这张主图继续改图：${activeImage.title}\n保持主图主体、构图和质感。\n${skillText}${parameterText}${referenceText}${layerText}${extra}${negative}${annotationText}`,
+      `Continue editing this main image: ${activeImage.title}\nKeep the main subject, composition, and texture.\n${skillText}${parameterText}${referenceText}${layerText}${extra}${negative}${annotationText}`,
     )
-  }, [activeImage, annotations, filledCanvasReferences, imageNegativePrompt, imageSkillId, language, prompt, tr])
+  }, [activeImage, annotations, canvasLayers, filledCanvasReferences, imageNegativePrompt, imageSkillId, language, prompt, tr])
 
   const importFiles = (fileList: FileList | File[]) => {
     const files = Array.from(fileList).filter((file) => file.type.startsWith('image/'))
@@ -1022,6 +1197,7 @@ function App() {
       return
     }
     setActiveImageId(image.id)
+    setSelectedLayerId(null)
     setZoomMode('fit')
     setStatus(tr('已把图片放到画布，并自动适应右侧可视区域', 'Image placed on the canvas and fitted to the right-side viewport.'))
   }
@@ -1754,6 +1930,72 @@ function App() {
     window.addEventListener('pointerup', stop)
   }
 
+  const startLayerDrag = (event: ReactPointerEvent<HTMLDivElement>, layer: CanvasImageLayer) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const canvas = event.currentTarget.parentElement
+    if (!canvas) return
+    const bounds = canvas.getBoundingClientRect()
+    const startX = event.clientX
+    const startY = event.clientY
+    const initialX = layer.x
+    const initialY = layer.y
+    setSelectedLayerId(layer.id)
+    setActiveTool('select')
+
+    const move = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault()
+      updateCanvasLayer(layer.id, {
+        x: Math.min(100, Math.max(0, initialX + ((moveEvent.clientX - startX) / bounds.width) * 100)),
+        y: Math.min(100, Math.max(0, initialY + ((moveEvent.clientY - startY) / bounds.height) * 100)),
+      })
+    }
+    const stop = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', stop)
+      setStatus(tr('素材位置已更新', 'Layer position updated.'))
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', stop)
+  }
+
+  const startLayerResize = (event: ReactPointerEvent<HTMLButtonElement>, layer: CanvasImageLayer, corner: ImageResizeCorner) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const layerElement = event.currentTarget.closest('.canvas-image-layer') as HTMLElement | null
+    const canvas = layerElement?.parentElement
+    if (!layerElement || !canvas) return
+    const canvasBounds = canvas.getBoundingClientRect()
+    const layerBounds = layerElement.getBoundingClientRect()
+    const startX = event.clientX
+    const initialWidth = layer.width
+    const initialX = layer.x
+    const initialY = layer.y
+    const horizontalDirection = corner.endsWith('right') ? 1 : -1
+    const verticalDirection = corner.startsWith('bottom') ? 1 : -1
+    const aspectRatio = layerBounds.width / Math.max(1, layerBounds.height)
+
+    const move = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault()
+      const deltaPixels = horizontalDirection * (moveEvent.clientX - startX)
+      const nextWidth = Math.min(90, Math.max(8, initialWidth + (deltaPixels / canvasBounds.width) * 100))
+      const widthDeltaPixels = ((nextWidth - initialWidth) / 100) * canvasBounds.width
+      const heightDeltaPixels = widthDeltaPixels / Math.max(0.1, aspectRatio)
+      updateCanvasLayer(layer.id, {
+        width: nextWidth,
+        x: Math.min(100, Math.max(0, initialX + (horizontalDirection * widthDeltaPixels * 50) / canvasBounds.width)),
+        y: Math.min(100, Math.max(0, initialY + (verticalDirection * heightDeltaPixels * 50) / canvasBounds.height)),
+      })
+    }
+    const stop = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', stop)
+      setStatus(tr('素材大小已更新', 'Layer size updated.'))
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', stop)
+  }
+
   const addAnnotation = (annotation: CanvasAnnotation) => {
     if (!activeImage) return
     setAnnotationMap((current) => ({
@@ -1915,6 +2157,7 @@ function App() {
               label: getReferenceLabel(item.index, language),
               image: item.image,
             })),
+            imageLayers: canvasLayers.map((layer) => ({ id: layer.id, imageId: layer.imageId, title: layer.title, x: layer.x, y: layer.y, width: layer.width, rotation: layer.rotation, opacity: layer.opacity, backgroundRemoved: layer.backgroundRemoved, zIndex: layer.zIndex })),
             annotations,
             skill: {
               id: imageSkillId,
@@ -1941,7 +2184,9 @@ function App() {
   const resetCanvas = () => {
     if (!activeImage) return
     setAnnotationMap((current) => ({ ...current, [activeImage.id]: [] }))
-    setStatus(tr('已清空当前图片的画布标注', 'Cleared the canvas annotations for the current image.'))
+    setCanvasLayerMap((current) => ({ ...current, [activeImage.id]: [] }))
+    setSelectedLayerId(null)
+    setStatus(tr('已清空当前图片的标注和素材图层', 'Cleared annotations and image layers for the current image.'))
   }
 
   const removeReferenceCanvasSlot = (slotIndex: number) => {
@@ -1998,7 +2243,7 @@ function App() {
       setStatus(tr('先放入一张要修改的图片', 'Place an image to edit first.'))
       return
     }
-    if (annotations.length === 0 && filledCanvasReferences.length === 0) {
+    if (annotations.length === 0 && filledCanvasReferences.length === 0 && canvasLayers.length === 0) {
       setStatus(tr('还没有画布标注或参考素材，先标出要改的地方，或把素材图放到下方槽里', 'No canvas annotations or reference materials yet. Mark the areas to edit, or drop reference images into the slots below.'))
       return
     }
@@ -2028,6 +2273,7 @@ function App() {
             label: getReferenceLabel(item.index, language),
             image: item.image,
           })),
+          imageLayers: canvasLayers.map((layer) => ({ id: layer.id, imageId: layer.imageId, title: layer.title, x: layer.x, y: layer.y, width: layer.width, rotation: layer.rotation, opacity: layer.opacity, backgroundRemoved: layer.backgroundRemoved, zIndex: layer.zIndex })),
           annotations,
           editPrompt,
           negativePrompt: imageNegativePrompt.trim(),
@@ -2086,7 +2332,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: videoProvider,
-          image: limitedImages[0],
+          image: limitedImages[0] ?? undefined,
           images: limitedImages,
           imageDataUrl: imageDataUrls[0],
           imageDataUrls,
@@ -2911,6 +3157,83 @@ function App() {
                     draggable={false}
                     onLoad={(event) => recordImageDimensions(activeImage.id, event.currentTarget)}
                   />
+                  {canvasLayers.map((layer) => {
+                    const isSelected = selectedLayerId === layer.id
+                    return (
+                      <div
+                        key={layer.id}
+                        className={'canvas-image-layer ' + (isSelected ? 'selected' : '')}
+                        style={{
+                          left: layer.x + '%',
+                          top: layer.y + '%',
+                          width: layer.width + '%',
+                          zIndex: 10 + layer.zIndex,
+                        }}
+                        onPointerDown={(event) => startLayerDrag(event, layer)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setSelectedLayerId(layer.id)
+                        }}
+                      >
+                        <div
+                          className="canvas-image-layer-visual"
+                          style={{ transform: 'rotate(' + layer.rotation + 'deg)', opacity: layer.opacity }}
+                        >
+                          <img src={layer.src} alt={layer.title} draggable={false} />
+                        </div>
+                        {isSelected ? (
+                          <div className="canvas-layer-toolbar" onPointerDown={(event) => event.stopPropagation()}>
+                            <button type="button" title={tr('逆时针旋转 15°', 'Rotate 15° counterclockwise')} aria-label={tr('逆时针旋转', 'Rotate counterclockwise')} onClick={() => updateCanvasLayer(layer.id, { rotation: layer.rotation - 15 })}>
+                              <RotateCcw size={14} />
+                            </button>
+                            <button type="button" title={tr('顺时针旋转 15°', 'Rotate 15° clockwise')} aria-label={tr('顺时针旋转', 'Rotate clockwise')} onClick={() => updateCanvasLayer(layer.id, { rotation: layer.rotation + 15 })}>
+                              <RotateCw size={14} />
+                            </button>
+                            <label title={tr('透明度', 'Opacity')}>
+                              <SlidersHorizontal size={14} />
+                              <input
+                                type="range"
+                                min="10"
+                                max="100"
+                                value={Math.round(layer.opacity * 100)}
+                                aria-label={tr('素材透明度', 'Layer opacity')}
+                                onChange={(event) => updateCanvasLayer(layer.id, { opacity: Number(event.target.value) / 100 })}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className={layer.backgroundRemoved ? 'active' : ''}
+                              disabled={processingLayerImageId === layer.imageId}
+                              title={layer.backgroundRemoved ? tr('恢复原背景', 'Restore original background') : tr('去除白底或纯色背景', 'Remove white or solid background')}
+                              aria-label={layer.backgroundRemoved ? tr('恢复原背景', 'Restore original background') : tr('去除背景', 'Remove background')}
+                              onClick={() => void toggleLayerBackground(layer)}
+                            >
+                              <Eraser size={14} />
+                            </button>
+                            <button type="button" title={tr('移到最上层', 'Bring to front')} aria-label={tr('移到最上层', 'Bring to front')} onClick={() => updateCanvasLayer(layer.id, { zIndex: Math.max(0, ...canvasLayers.map((item) => item.zIndex)) + 1 })}>
+                              <BringToFront size={14} />
+                            </button>
+                            <button type="button" title={tr('移到最下层', 'Send to back')} aria-label={tr('移到最下层', 'Send to back')} onClick={() => updateCanvasLayer(layer.id, { zIndex: Math.min(0, ...canvasLayers.map((item) => item.zIndex)) - 1 })}>
+                              <SendToBack size={14} />
+                            </button>
+                            <button type="button" className="danger" title={tr('删除素材图层', 'Delete image layer')} aria-label={tr('删除素材图层', 'Delete image layer')} onClick={() => removeCanvasLayer(layer.id)}>
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ) : null}
+                        {imageResizeCorners.map((corner) => (
+                          <button
+                            key={corner}
+                            type="button"
+                            className={'canvas-layer-resize canvas-layer-resize-' + corner}
+                            aria-label={tr(corner + ' 拖拽缩放素材', corner + ' drag to resize layer')}
+                            title={tr('拖拽缩放素材', 'Drag to resize layer')}
+                            onPointerDown={(event) => startLayerResize(event, layer, corner)}
+                          />
+                        ))}
+                      </div>
+                    )
+                  })}
                   <svg className="drawing-layer" viewBox="0 0 100 100" preserveAspectRatio="none">
                     <defs>
                       <marker id="arrow-head" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
@@ -3068,13 +3391,24 @@ function App() {
                               <div className="reference-slot-actions">
                                 <button
                                   type="button"
-                                  aria-label={tr(`移除 ${getReferenceLabel(index, 'zh')} 图片`, `Remove image from ${referenceLabel}`)}
+                                  aria-label={tr(`把 ${getReferenceLabel(index, 'zh')} 放入主图`, `Place ${referenceLabel} on main image`)}
                                   onClick={(event) => {
                                     event.stopPropagation()
-                                    setCanvasReferences((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, imageId: undefined } : item)))
+                                    void addImageLayer(referenceImage, false)
                                   }}
                                 >
-                                  {tr('移除', 'Remove')}
+                                  {tr('放入', 'Place')}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={processingLayerImageId === referenceImage.id}
+                                  aria-label={tr(`透明化并把 ${getReferenceLabel(index, 'zh')} 放入主图`, `Remove background and place ${referenceLabel} on main image`)}
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    void addImageLayer(referenceImage, true)
+                                  }}
+                                >
+                                  {processingLayerImageId === referenceImage.id ? tr('处理中', 'Working') : tr('透明放入', 'Cutout')}
                                 </button>
                                 <button
                                   type="button"
