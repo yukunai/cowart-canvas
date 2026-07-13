@@ -53,7 +53,7 @@
       .primary:disabled { cursor: not-allowed; opacity: .55; }
       .secondary { min-height: 34px; border: 1px solid #ccd6e1; background: #fff; color: #334252; padding: 0 11px; font-size: 12px; }
       .secondary.danger { color: #c0342b; }
-      .workspace { display: grid; grid-template-rows: 50px minmax(270px, 1fr) 326px; min-width: 0; min-height: 0; }
+      .workspace { display: grid; grid-template-rows: 50px minmax(230px, 1fr) minmax(360px, 43vh); min-width: 0; min-height: 0; }
       .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #dce3ea; background: #fff; padding: 0 14px; }
       .topbar-left, .topbar-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
       .status { overflow: hidden; color: #687889; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
@@ -66,17 +66,26 @@
       .preview-empty { color: #afbcc9; text-align: center; }
       .preview-empty strong { display: block; color: #e6ebf0; font-size: 14px; margin-bottom: 6px; }
       .safe-zone { position: absolute; inset: 7%; border: 1px dashed rgba(255,255,255,.35); pointer-events: none; }
-      .timeline { min-width: 0; overflow: auto; border-top: 1px solid #d6dee7; background: #fff; padding: 12px 14px; }
-      .timeline-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-      .timeline-tools { display: flex; gap: 6px; }
-      .ruler { position: relative; height: 23px; border-bottom: 1px solid #cfd8e3; color: #758495; font-size: 10px; }
+      .timeline { display: grid; grid-template-rows: auto 14px minmax(0, 1fr); min-width: 0; min-height: 0; overflow: hidden; border-top: 1px solid #d6dee7; background: #fff; padding: 10px 14px 0; }
+      .timeline-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+      .timeline-tools, .timeline-command-group, .timeline-zoom { display: flex; align-items: center; gap: 6px; }
+      .timeline-tools { flex-wrap: wrap; justify-content: flex-end; }
+      .timeline-tools .icon-button { width: 32px; height: 32px; min-height: 32px; border: 1px solid #ccd6e1; background: #fff; color: #334252; padding: 0; }
+      .timeline-tools .icon-button:disabled { cursor: not-allowed; opacity: .38; }
+      .timeline-zoom { color: #687889; font-size: 11px; }
+      .timeline-zoom input { width: 92px; min-height: 18px; padding: 0; }
+      .timeline-scrollbar-top { overflow-x: auto; overflow-y: hidden; height: 14px; border-top: 1px solid #edf1f5; }
+      .timeline-scrollbar-top > div { height: 1px; }
+      .timeline-viewport { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; padding-bottom: 4px; }
+      .timeline-content { width: max-content; min-width: 100%; }
+      .ruler { position: relative; height: 25px; margin-left: 82px; border-bottom: 1px solid #cfd8e3; color: #758495; font-size: 10px; cursor: ew-resize; }
       .ruler span { position: absolute; transform: translateX(-50%); }
-      .timeline-stack { position: relative; display: grid; gap: 5px; min-width: 760px; margin-top: 8px; }
-      .track-row { display: grid; grid-template-columns: 82px minmax(0, 1fr); min-height: 38px; border-radius: 6px; overflow: hidden; }
-      .track-label { display: flex; align-items: center; justify-content: space-between; gap: 5px; border-right: 1px solid #d1dae4; background: #e3e9ef; color: #435466; padding: 0 8px; font-size: 10px; font-weight: 800; }
+      .timeline-stack { position: relative; display: grid; gap: 5px; margin-top: 6px; }
+      .track-row { display: grid; grid-template-columns: 82px auto; min-height: 38px; border-radius: 6px; }
+      .track-label { position: sticky; left: 0; z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 5px; border-right: 1px solid #d1dae4; background: #e3e9ef; color: #435466; padding: 0 8px; font-size: 10px; font-weight: 800; }
       .track-label button { width: 22px; height: 22px; border: 0; border-radius: 5px; background: transparent; color: #647586; font-size: 10px; padding: 0; }
       .track-label button:hover, .track-label button.active { background: #fff; color: #1c61bd; }
-      .track { position: relative; display: flex; gap: 4px; min-height: 38px; padding: 4px; background: #edf1f5; overflow: hidden; }
+      .track { position: relative; display: flex; flex: 0 0 auto; gap: 4px; min-height: 38px; padding: 4px; background: #edf1f5; overflow: visible; }
       .track.video-track { min-height: 54px; }
       .track.audio-track { background: #edf5f1; }
       .track.narration-track { background: #f3eff8; }
@@ -96,7 +105,7 @@
       .audio-clip { border: 1px solid #6fb494; background: repeating-linear-gradient(90deg, #cce9dc 0 3px, #def1e8 3px 6px); color: #246449; }
       .narration-clip { border: 1px solid #a58ac7; background: #e8ddf4; color: #64458a; }
       .caption-clip { border: 1px solid #c8a45a; background: #f4e6c5; color: #795b1d; }
-      .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #e13c32; pointer-events: none; z-index: 4; }
+      .playhead { position: absolute; top: -31px; bottom: -143px; width: 2px; background: #e13c32; pointer-events: none; z-index: 5; }
       .playhead::before { content: ""; position: absolute; top: 0; left: -4px; width: 10px; height: 8px; background: #e13c32; clip-path: polygon(0 0,100% 0,50% 100%); }
       .analysis-card { display: grid; gap: 8px; border: 1px solid #dbe3eb; border-radius: 8px; background: #f8fafc; padding: 10px; }
       .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
@@ -121,7 +130,7 @@
       .spinner { width: 14px; height: 14px; border: 2px solid #ccd9e8; border-top-color: #2474ed; border-radius: 50%; animation: spin .8s linear infinite; }
       @keyframes loading { from { transform: translateX(-110%); } to { transform: translateX(300%); } }
       @keyframes spin { to { transform: rotate(360deg); } }
-      @media (max-width: 1220px) { .app { grid-template-columns: 310px minmax(480px, 1fr) 250px; } }
+      @media (max-width: 1220px) { .app { grid-template-columns: 310px minmax(480px, 1fr) 250px; } .workspace { grid-template-rows: 50px minmax(210px, 1fr) minmax(350px, 45vh); } }
     </style>
   </head>
   <body>
@@ -170,14 +179,19 @@
           <div class="preview-shell landscape" id="previewShell"><div class="preview-empty" id="previewEmpty"><strong>还没有导入视频</strong><span>AI 分析和手动剪辑都在这个独立页面完成</span></div><video id="preview" controls hidden></video><div class="safe-zone" id="safeZone" hidden></div></div>
         </div>
         <section class="timeline">
-          <div class="timeline-head"><div><h2>可编辑时间线</h2><p class="muted" id="timelineSummary">AI 选择的片段会出现在这里，可以拖动排序、分割或删除。</p></div><div class="timeline-tools"><button class="secondary" id="addButton">加入当前位置</button><button class="secondary" id="splitButton">分割</button><button class="secondary" id="restoreButton">恢复整段</button></div></div>
-          <div class="ruler" id="ruler"></div>
-          <div class="timeline-stack" id="timelineStack">
-            <div class="track-row"><div class="track-label"><span>V2 叠加</span><button type="button" title="隐藏叠加轨">◉</button></div><div class="track overlay-track" id="overlayTrack"><span class="track-empty">叠加画面、图片或补充镜头</span></div></div>
-            <div class="track-row"><div class="track-label"><span>V1 主视频</span><button type="button" title="隐藏视频轨">◉</button></div><div class="track video-track" id="track"><div class="playhead" id="playhead" hidden></div></div></div>
-            <div class="track-row"><div class="track-label"><span>A1 原声</span><button type="button" class="track-mute" data-track="original" title="静音原声">M</button></div><div class="track audio-track" id="audioTrack"><span class="track-empty">源视频音频</span></div></div>
-            <div class="track-row"><div class="track-label"><span>A2 配音</span><button type="button" class="track-mute" data-track="narration" title="静音配音">M</button></div><div class="track narration-track" id="narrationTrack"><span class="track-empty">影视解说或背景音乐</span></div></div>
-            <div class="track-row"><div class="track-label"><span>T1 字幕</span><button type="button" title="隐藏字幕轨">◉</button></div><div class="track caption-track" id="captionTrack"><span class="track-empty">字幕与重点文字</span></div></div>
+          <div class="timeline-head"><div><h2>可编辑时间线</h2><p class="muted" id="timelineSummary">AI 选择的片段会出现在这里，可以拖动排序、分割或删除。</p></div><div class="timeline-tools"><div class="timeline-command-group"><button class="icon-button" id="undoButton" title="撤销" aria-label="撤销" disabled>↶</button><button class="icon-button" id="redoButton" title="重做" aria-label="重做" disabled>↷</button></div><button class="secondary" id="splitButton">分割</button><button class="secondary" id="deleteSelectedButton">删除所选</button><button class="secondary" id="duplicateButton">复制片段</button><button class="secondary" id="addButton">加入当前位置</button><button class="secondary" id="restoreButton">恢复整段</button><label class="timeline-zoom">缩放<input id="timelineZoom" type="range" min="6" max="30" value="14" /></label></div></div>
+          <div class="timeline-scrollbar-top" id="timelineScrollTop"><div id="timelineScrollTopSpacer"></div></div>
+          <div class="timeline-viewport" id="timelineViewport">
+            <div class="timeline-content" id="timelineContent">
+              <div class="ruler" id="ruler"></div>
+              <div class="timeline-stack" id="timelineStack">
+                <div class="track-row"><div class="track-label"><span>V2 叠加</span><button type="button" title="隐藏叠加轨">◉</button></div><div class="track overlay-track" id="overlayTrack"><span class="track-empty">叠加画面、图片或补充镜头</span></div></div>
+                <div class="track-row"><div class="track-label"><span>V1 主视频</span><button type="button" title="隐藏视频轨">◉</button></div><div class="track video-track" id="track"><div class="playhead" id="playhead" hidden></div></div></div>
+                <div class="track-row"><div class="track-label"><span>A1 原声</span><button type="button" class="track-mute" data-track="original" title="静音原声">M</button></div><div class="track audio-track" id="audioTrack"><span class="track-empty">源视频音频</span></div></div>
+                <div class="track-row"><div class="track-label"><span>A2 配音</span><button type="button" class="track-mute" data-track="narration" title="静音配音">M</button></div><div class="track narration-track" id="narrationTrack"><span class="track-empty">影视解说或背景音乐</span></div></div>
+                <div class="track-row"><div class="track-label"><span>T1 字幕</span><button type="button" title="隐藏字幕轨">◉</button></div><div class="track caption-track" id="captionTrack"><span class="track-empty">字幕与重点文字</span></div></div>
+              </div>
+            </div>
           </div>
         </section>
       </section>
@@ -209,7 +223,7 @@
         <section class="panel stack result" id="resultPanel"><div class="section-title"><h2>导出结果</h2><a class="secondary" id="downloadLink" download>下载</a></div><video id="resultVideo" controls></video><p class="muted" id="resultPath"></p></section>
       </aside>
     </main>
-    <script>
+    <script type="text/plain" id="legacyVideoEditorScript">
       const state = { mode: 'highlights', source: null, segments: [], activeId: null, draggedId: null, aspectRatio: '16:9', analysis: null, muteOriginal: false, muteNarration: false, cropZoom: 1, cropX: .5, cropY: .5 };
       const $ = (selector) => document.querySelector(selector);
       const apiBase = location.protocol === 'file:' ? 'http://127.0.0.1:43219' : '';
@@ -251,5 +265,6 @@
       $('#commentaryScript').oninput = () => { renderSegments(); saveProject(); }; $('#editGoal').oninput = saveProject;
       (() => { try { const saved = JSON.parse(localStorage.getItem('cowart-video-editor-project') || 'null'); if (!saved) return; if (saved.source?.path) { state.segments = saved.segments || []; state.activeId = saved.activeId || state.segments[0]?.id; loadSource(saved.source); renderSegments(); } if (saved.editGoal) $('#editGoal').value = saved.editGoal; if (saved.commentaryScript) $('#commentaryScript').value = saved.commentaryScript; $('#cropZoom').value = String(Math.round(Number(saved.cropZoom || 1) * 100)); $('#cropX').value = String(Math.round(Number(saved.cropX ?? .5) * 100)); $('#cropY').value = String(Math.round(Number(saved.cropY ?? .5) * 100)); setMode(saved.mode || 'highlights'); $('#aspectRatio').value = saved.aspectRatio || '16:9'; setAspect($('#aspectRatio').value); } catch {} })();
     </script>
+    <script src="/video-editor.js"></script>
   </body>
 </html>

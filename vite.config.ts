@@ -2108,10 +2108,13 @@ type EditorSegment = {
 
 const videoEditorRoot = path.join(os.homedir(), '.cowart-canvas', 'video-editor')
 const videoEditorUploadRoot = path.join(videoEditorRoot, 'uploads')
+const videoEditorProxyRoot = path.join(videoEditorRoot, 'proxies')
 const videoEditorExportRoot = path.join(os.homedir(), 'Downloads', 'Cowart Edits')
+const editorProxyJobs = new Map<string, Promise<string>>()
 
 function ensureVideoEditorDirectories() {
   fs.mkdirSync(videoEditorUploadRoot, { recursive: true })
+  fs.mkdirSync(videoEditorProxyRoot, { recursive: true })
   fs.mkdirSync(videoEditorExportRoot, { recursive: true })
 }
 
@@ -2158,6 +2161,42 @@ async function probeEditorVideo(filePath: string) {
     size: Number(data.format?.size || 0),
     frameRate: video?.avg_frame_rate || '',
   }
+}
+
+async function ensureEditorProxy(filePath: string) {
+  await probeEditorVideo(filePath)
+  ensureVideoEditorDirectories()
+  const stat = fs.statSync(filePath)
+  const key = crypto.createHash('sha1').update(`proxy-v2:${filePath}:${stat.size}:${stat.mtimeMs}`).digest('hex').slice(0, 20)
+  const proxyPath = path.join(videoEditorProxyRoot, `${key}-proxy.mp4`)
+  if (safeStat(proxyPath)?.isFile()) return proxyPath
+
+  const running = editorProxyJobs.get(proxyPath)
+  if (running) return running
+
+  const job = (async () => {
+    const temporaryPath = `${proxyPath}.partial.mp4`
+    try {
+      const videoEncoderArgs = process.platform === 'darwin'
+        ? ['-c:v', 'h264_videotoolbox', '-realtime', '1', '-b:v', '300k', '-maxrate', '400k', '-bufsize', '800k']
+        : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '32']
+      await execFileAsync('ffmpeg', [
+        '-y', '-hide_banner', '-loglevel', 'error', '-i', filePath,
+        '-map', '0:v:0', '-map', '0:a?',
+        '-vf', 'scale=640:-2:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2',
+        ...videoEncoderArgs,
+        '-g', '30', '-keyint_min', '30', '-sc_threshold', '0',
+        '-c:a', 'aac', '-b:a', '48k', '-movflags', '+faststart', temporaryPath,
+      ], { maxBuffer: 64 * 1024 * 1024 })
+      fs.renameSync(temporaryPath, proxyPath)
+      return proxyPath
+    } finally {
+      fs.rmSync(temporaryPath, { force: true })
+      editorProxyJobs.delete(proxyPath)
+    }
+  })()
+  editorProxyJobs.set(proxyPath, job)
+  return job
 }
 
 function mergeEditorRanges(ranges: Array<{ start: number; end: number }>, gap = 0.18) {
@@ -2340,6 +2379,23 @@ function localImageImportPlugin(): PluginOption {
         } catch (error) {
           res.statusCode = 400
           sendJson(res, { error: error instanceof Error ? error.message : '无法导入视频' })
+        }
+      })
+
+      server.middlewares.use('/api/video-editor-proxy', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        try {
+          if (req.method !== 'POST') {
+            res.statusCode = 405
+            sendJson(res, { error: 'Method not allowed' })
+            return
+          }
+          const body = (await readJsonBody(req, 1024 * 1024)) as { path?: string }
+          if (!body.path) throw new Error('请先导入视频')
+          const proxyPath = await ensureEditorProxy(body.path)
+          sendJson(res, { path: proxyPath, url: `/api/local-video?path=${encodeURIComponent(proxyPath)}` })
+        } catch (error) {
+          res.statusCode = 400
+          sendJson(res, { error: error instanceof Error ? error.message : '无法创建流畅预览' })
         }
       })
 
