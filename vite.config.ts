@@ -2258,7 +2258,7 @@ function normalizeEditorSegments(segments: EditorSegment[], duration: number) {
     .slice(0, 80)
 }
 
-async function exportEditorVideo(body: { path?: string; segments?: EditorSegment[]; aspectRatio?: string; quality?: string; title?: string; focusX?: number; commentaryScript?: string; narrationEnabled?: boolean }) {
+async function exportEditorVideo(body: { path?: string; segments?: EditorSegment[]; aspectRatio?: string; quality?: string; title?: string; focusX?: number; commentaryScript?: string; narrationEnabled?: boolean; muteOriginal?: boolean }) {
   const filePath = body.path || ''
   const meta = await probeEditorVideo(filePath)
   const segments = normalizeEditorSegments(body.segments || [], meta.duration)
@@ -2269,18 +2269,19 @@ async function exportEditorVideo(body: { path?: string; segments?: EditorSegment
   const aspect = body.aspectRatio === '9:16' ? '9:16' : body.aspectRatio === '1:1' ? '1:1' : '16:9'
   const size = aspect === '9:16' ? { width: 1080, height: 1920 } : aspect === '1:1' ? { width: 1080, height: 1080 } : { width: 1920, height: 1080 }
   const focusX = Math.min(1, Math.max(0, Number(body.focusX ?? 0.5)))
+  const hasSourceAudio = meta.hasAudio && !body.muteOriginal
   const filters: string[] = []
   const concatInputs: string[] = []
   segments.forEach((segment, index) => {
     const videoFilter = `trim=start=${segment.start}:end=${segment.end},setpts=PTS-STARTPTS,scale=${size.width}:${size.height}:force_original_aspect_ratio=increase,crop=${size.width}:${size.height}:x=(iw-ow)*${focusX.toFixed(3)}:y=(ih-oh)/2`
     filters.push(`[0:v]${videoFilter},setsar=1[v${index}]`)
     concatInputs.push(`[v${index}]`)
-    if (meta.hasAudio) {
+    if (hasSourceAudio) {
       filters.push(`[0:a]atrim=start=${segment.start}:end=${segment.end},asetpts=PTS-STARTPTS[a${index}]`)
       concatInputs.push(`[a${index}]`)
     }
   })
-  filters.push(`${concatInputs.join('')}concat=n=${segments.length}:v=1:a=${meta.hasAudio ? 1 : 0}[vout]${meta.hasAudio ? '[aout]' : ''}`)
+  filters.push(`${concatInputs.join('')}concat=n=${segments.length}:v=1:a=${hasSourceAudio ? 1 : 0}[vout]${hasSourceAudio ? '[aout]' : ''}`)
   const narrationText = body.narrationEnabled ? String(body.commentaryScript || '').trim().slice(0, 8000) : ''
   const narrationPath = path.join(videoEditorRoot, `${stamp}-narration.aiff`)
   let hasNarration = false
@@ -2294,13 +2295,13 @@ async function exportEditorVideo(body: { path?: string; segments?: EditorSegment
   }
   const args = ['-y', '-hide_banner', '-i', filePath]
   if (hasNarration) args.push('-i', narrationPath)
-  if (hasNarration && meta.hasAudio) filters.push('[aout]volume=0.22[abase];[1:a]volume=1.0[voice];[abase][voice]amix=inputs=2:duration=first:dropout_transition=2[amixed]')
+  if (hasNarration && hasSourceAudio) filters.push('[aout]volume=0.22[abase];[1:a]volume=1.0[voice];[abase][voice]amix=inputs=2:duration=first:dropout_transition=2[amixed]')
   args.push('-filter_complex', filters.join(';'), '-map', '[vout]')
-  if (hasNarration && meta.hasAudio) args.push('-map', '[amixed]')
+  if (hasNarration && hasSourceAudio) args.push('-map', '[amixed]')
   else if (hasNarration) args.push('-map', '1:a')
-  else if (meta.hasAudio) args.push('-map', '[aout]')
+  else if (hasSourceAudio) args.push('-map', '[aout]')
   args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', body.quality === 'high' ? '18' : '22', '-pix_fmt', 'yuv420p')
-  if (meta.hasAudio) args.push('-c:a', 'aac', '-b:a', '160k')
+  if (hasSourceAudio) args.push('-c:a', 'aac', '-b:a', '160k')
   else if (hasNarration) args.push('-c:a', 'aac', '-b:a', '160k')
   args.push('-movflags', '+faststart', outputPath)
   await execFileAsync('ffmpeg', args, { maxBuffer: 64 * 1024 * 1024 })

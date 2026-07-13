@@ -57,6 +57,7 @@ The app runs on your own machine. Imported images, generated task files, video t
 - Refresh provider results, preview videos, download videos, and save videos directly to `~/Downloads/Cowart Videos`.
 - Use a standalone Video Editor with AI Highlights, Film Commentary, and Manual Editing workflows.
 - Split, delete, restore, reorder, and precisely trim clips on an editable timeline.
+- Use five aligned tracks: V1 main video, V2 overlays, A1 source audio, A2 narration/music, and T1 captions.
 - Convert footage between 16:9, 9:16, and 1:1 while adjusting horizontal subject framing.
 - Draft commentary and optionally mix local macOS Chinese narration into the MP4 export.
 - Export locally with FFmpeg to `~/Downloads/Cowart Edits` without overwriting the source video.
