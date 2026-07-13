@@ -129,6 +129,7 @@ const applyTimelineGeometry = () => {
   $('#timelineContent').style.width = `${totalWidth}px`
   $('#timelineStack').style.width = `${totalWidth}px`
   $('#timelineScrollTopSpacer').style.width = `${totalWidth}px`
+  $('#timelineScrollBottomSpacer').style.width = `${totalWidth}px`
   $('#ruler').style.width = `${layout.width}px`
   ;['overlayTrack', 'track', 'audioTrack', 'narrationTrack', 'captionTrack'].forEach((id) => {
     $(`#${id}`).style.width = `${layout.width}px`
@@ -254,15 +255,15 @@ const startClipDrag = (event, segment, clip) => {
       return
     }
     const from = state.segments.findIndex((item) => item.id === segment.id)
-    const siblings = [...track.querySelectorAll('.clip')]
+    const siblings = [...track.querySelectorAll('.clip')].filter((node) => node !== clip)
     let to = from
     let closest = Number.POSITIVE_INFINITY
-    siblings.forEach((node, index) => {
+    siblings.forEach((node) => {
       const rect = node.getBoundingClientRect()
       const distance = Math.abs(lastX - (rect.left + rect.width / 2))
       if (distance < closest) {
         closest = distance
-        to = index
+        to = state.segments.findIndex((item) => item.id === node.dataset.id)
       }
     })
     if (from >= 0 && to >= 0 && from !== to) {
@@ -358,6 +359,7 @@ const renderSegments = () => {
   updatePlayhead()
   $('#timelineViewport').scrollLeft = scrollLeft
   $('#timelineScrollTop').scrollLeft = scrollLeft
+  $('#timelineScrollBottom').scrollLeft = scrollLeft
 }
 
 const attachProxy = async (source) => {
@@ -646,6 +648,48 @@ const scrubTimeline = (event) => {
   window.addEventListener('pointerup', finish, { once: true })
 }
 
+const dragPlayhead = (event) => {
+  if (!state.source || !state.segments.length) return
+  event.preventDefault()
+  event.stopPropagation()
+  const ruler = $('#ruler')
+  const update = (moveEvent) => {
+    const rect = ruler.getBoundingClientRect()
+    const x = Math.max(0, Math.min(rect.width, moveEvent.clientX - rect.left))
+    seekEditTime(xToEditTime(x))
+  }
+  update(event)
+  const finish = () => {
+    window.removeEventListener('pointermove', update)
+    window.removeEventListener('pointerup', finish)
+    saveProject()
+  }
+  window.addEventListener('pointermove', update)
+  window.addEventListener('pointerup', finish, { once: true })
+}
+
+const panTimeline = (event) => {
+  if (event.button !== 0 || event.target.closest('button, input, .clip, .playhead, .ruler')) return
+  const viewport = $('#timelineViewport')
+  const startX = event.clientX
+  const startScroll = viewport.scrollLeft
+  let moved = false
+  const move = (moveEvent) => {
+    const delta = moveEvent.clientX - startX
+    if (!moved && Math.abs(delta) < 4) return
+    moved = true
+    event.preventDefault()
+    viewport.scrollLeft = startScroll - delta
+  }
+  const finish = () => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', finish)
+    if (moved) setStatus('时间线位置已移动')
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', finish, { once: true })
+}
+
 const applyClipEditor = () => {
   const segment = state.segments.find((item) => item.id === state.activeId)
   if (!segment || !state.source) return
@@ -672,6 +716,8 @@ $('#dropzone').ondrop = (event) => { event.preventDefault(); $('#dropzone').clas
 
 $('#ruler').onpointerdown = scrubTimeline
 $('#track').onpointerdown = scrubTimeline
+$('#playhead').onpointerdown = dragPlayhead
+$('#timelineStack').onpointerdown = panTimeline
 $('#analyzeButton').onclick = analyze
 $('#draftScriptButton').onclick = draftCommentary
 $('#splitButton').onclick = splitAtPlayhead
@@ -692,6 +738,7 @@ $('#timelineZoom').oninput = (event) => {
   const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
   viewport.scrollLeft = ratio * maxScroll
   $('#timelineScrollTop').scrollLeft = viewport.scrollLeft
+  $('#timelineScrollBottom').scrollLeft = viewport.scrollLeft
   saveProject()
 }
 
@@ -700,12 +747,21 @@ $('#timelineViewport').onscroll = () => {
   if (syncingScroll) return
   syncingScroll = true
   $('#timelineScrollTop').scrollLeft = $('#timelineViewport').scrollLeft
+  $('#timelineScrollBottom').scrollLeft = $('#timelineViewport').scrollLeft
   syncingScroll = false
 }
 $('#timelineScrollTop').onscroll = () => {
   if (syncingScroll) return
   syncingScroll = true
   $('#timelineViewport').scrollLeft = $('#timelineScrollTop').scrollLeft
+  $('#timelineScrollBottom').scrollLeft = $('#timelineScrollTop').scrollLeft
+  syncingScroll = false
+}
+$('#timelineScrollBottom').onscroll = () => {
+  if (syncingScroll) return
+  syncingScroll = true
+  $('#timelineViewport').scrollLeft = $('#timelineScrollBottom').scrollLeft
+  $('#timelineScrollTop').scrollLeft = $('#timelineScrollBottom').scrollLeft
   syncingScroll = false
 }
 
