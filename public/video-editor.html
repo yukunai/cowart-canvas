@@ -136,6 +136,86 @@
       @keyframes spin { to { transform: rotate(360deg); } }
       @media (max-width: 1220px) { .app { grid-template-columns: 310px minmax(480px, 1fr) 250px; } .workspace { grid-template-rows: 50px minmax(210px, 1fr) minmax(350px, 45vh); } }
     </style>
+    <style>
+      :root { color: #edf1f5; background: #111315; color-scheme: dark; }
+      body { background: #111315; }
+      .app { grid-template-columns: 320px minmax(620px, 1fr) 310px; background: #111315; }
+      .sidebar, .inspector { background: #17191c; scrollbar-color: #4c535b #17191c; }
+      .sidebar { border-right-color: #2a2e33; }
+      .inspector { border-left-color: #2a2e33; }
+      .panel { border-bottom-color: #292d32; padding: 12px 14px; }
+      h2 { color: #f2f5f7; }
+      h3, label { color: #cbd2d9; }
+      .muted, .status { color: #88929c; }
+      .mode-nav { gap: 5px; }
+      .mode-nav button, .mode-tabs button { border-color: #343941; background: #1c1f23; color: #c6cdd4; }
+      .mode-nav button:hover, .mode-tabs button:hover { border-color: #59636e; background: #24282d; }
+      .mode-nav button.active, .mode-tabs button.active { border-color: #2693ff; background: #183957; color: #82c4ff; }
+      textarea, input, select { border-color: #353a42; background: #202328; color: #edf1f5; }
+      textarea:focus, input:focus, select:focus { border-color: #2693ff; box-shadow: 0 0 0 2px rgba(38,147,255,.16); }
+      .check-row { color: #aeb7c0; }
+      .primary { border-color: #1689f7; background: #1689f7; }
+      .secondary, .icon-button { border-color: #3a4048; background: #202328; color: #dce2e8; }
+      .secondary:hover, .icon-button:hover { border-color: #59636e; background: #292d33; }
+      .secondary.danger { color: #ff8179; }
+      .dropzone { border-color: #4a525c; background: #1c1f23; color: #8f9aa5; }
+      .dropzone strong { color: #e1e6eb; }
+      .dropzone.dragging { border-color: #2693ff; background: #172b3d; }
+      .file-summary { grid-template-columns: 104px 1fr; }
+      .file-poster { width: 104px; height: 60px; border: 1px solid #3b424a; border-radius: 5px; background-color: #0b0d0f; background-position: center; background-size: cover; color: transparent; }
+      .file-summary small { color: #7f8a95; }
+      .workspace { grid-template-rows: 48px minmax(280px, 1fr) minmax(360px, 46vh); }
+      .topbar { border-bottom-color: #2a2e33; background: #17191c; }
+      .topbar-left > strong { font-size: 13px; }
+      .canvas { background: #101214; padding: 16px 22px; }
+      .preview-shell { border: 1px solid #292e34; border-radius: 3px; background: #07090b; box-shadow: 0 18px 38px rgba(0,0,0,.38); }
+      .preview-shell.landscape { width: min(86%, 980px); }
+      .timeline { border-top-color: #2b3036; background: #141619; padding: 8px 12px 0; }
+      .timeline-head { margin-bottom: 6px; }
+      .timeline-head h2 { font-size: 12px; }
+      .timeline-tools { flex-wrap: nowrap; }
+      .timeline-tools .secondary { min-height: 30px; padding: 0 9px; }
+      .timeline-tools .icon-button { width: 30px; height: 30px; min-height: 30px; border-color: #353b43; background: #1b1e22; color: #cfd6dc; }
+      .timeline-zoom { color: #8d98a3; }
+      .timeline-scrollbar { border-color: #262a2f; scrollbar-color: #555d66 #202328; }
+      .timeline-scrollbar::-webkit-scrollbar-track { background: #202328; }
+      .timeline-scrollbar::-webkit-scrollbar-thumb { border-color: #202328; background: #555d66; }
+      .ruler { border-bottom-color: #343941; color: #7f8994; }
+      .track-row { gap: 0; border-radius: 3px; }
+      .track-label { border-right-color: #363b42; background: #1b1e22; color: #aab4bd; }
+      .track-label button { color: #73808b; }
+      .track-label button:hover, .track-label button.active { background: #2a3036; color: #6eb9ff; }
+      .track { gap: 2px; background: #202328; }
+      .track.video-track { min-height: 72px; }
+      .track.audio-track { background: #19231f; }
+      .track.narration-track { background: #211d28; }
+      .track.caption-track { background: #282318; }
+      .track.overlay-track { background: #1c2025; }
+      .track-empty { color: #67727d; }
+      .clip { height: 64px; border-color: #238eff; border-radius: 3px; background-color: #172534; background-image: linear-gradient(180deg, rgba(5,9,13,.03), rgba(6,10,14,.12) 54%, rgba(12,22,31,.94) 55%); background-position: center; background-size: cover; color: #eef7ff; padding: 37px 7px 4px; text-align: left; }
+      .clip::after { content: ""; position: absolute; inset: 0; z-index: 0; background: linear-gradient(180deg, transparent 35%, rgba(6,10,14,.92) 78%); pointer-events: none; }
+      .clip.dragging { opacity: .55; }
+      .clip.active { border-color: #46a9ff; box-shadow: 0 0 0 2px rgba(38,147,255,.34); }
+      .clip strong, .clip small { position: relative; z-index: 2; color: #f4f8fb; text-shadow: 0 1px 2px #000; }
+      .clip strong { font-size: 10px; }
+      .clip small { color: #c8d3dc; font-size: 9px; }
+      .trim-handle { z-index: 4; background: rgba(48,161,255,.3); }
+      .audio-clip, .narration-clip, .caption-clip { height: 34px; border-radius: 2px; }
+      .audio-clip { border-color: #1cae6e; background: repeating-linear-gradient(90deg, #11975c 0 2px, #0f6f48 2px 4px, #15b770 4px 5px, #0d603e 5px 8px); color: #eafff4; }
+      .narration-clip { border-color: #9b72d0; background: #4b3960; color: #f0e8fa; }
+      .caption-clip { border-color: #c29a42; background: #594820; color: #fff0c8; }
+      .analysis-card { border-color: #30353c; background: #1c1f23; }
+      .metric { background: #22262b; }
+      .metric span { color: #7e8994; }
+      .segment-row { background: #202328; }
+      .segment-row.active { background: #183957; }
+      .segment-row button { color: #dbe2e8; }
+      .segment-row small { color: #7f8a95; }
+      .delete { color: #ff8179; }
+      .delete:hover { background: #452523; }
+      .progress { background: #30363d; }
+      @media (max-width: 1220px) { .app { grid-template-columns: 286px minmax(560px, 1fr) 270px; } }
+    </style>
   </head>
   <body>
     <main class="app">

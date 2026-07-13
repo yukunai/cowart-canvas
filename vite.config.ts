@@ -2109,12 +2109,16 @@ type EditorSegment = {
 const videoEditorRoot = path.join(os.homedir(), '.cowart-canvas', 'video-editor')
 const videoEditorUploadRoot = path.join(videoEditorRoot, 'uploads')
 const videoEditorProxyRoot = path.join(videoEditorRoot, 'proxies')
+const videoEditorThumbnailRoot = path.join(videoEditorRoot, 'thumbnails')
 const videoEditorExportRoot = path.join(os.homedir(), 'Downloads', 'Cowart Edits')
 const editorProxyJobs = new Map<string, Promise<string>>()
+const editorThumbnailJobs = new Map<string, Promise<string>>()
+let editorThumbnailQueue = Promise.resolve()
 
 function ensureVideoEditorDirectories() {
   fs.mkdirSync(videoEditorUploadRoot, { recursive: true })
   fs.mkdirSync(videoEditorProxyRoot, { recursive: true })
+  fs.mkdirSync(videoEditorThumbnailRoot, { recursive: true })
   fs.mkdirSync(videoEditorExportRoot, { recursive: true })
 }
 
@@ -2196,6 +2200,36 @@ async function ensureEditorProxy(filePath: string) {
     }
   })()
   editorProxyJobs.set(proxyPath, job)
+  return job
+}
+
+async function ensureEditorThumbnail(filePath: string, requestedTime: number) {
+  await probeEditorVideo(filePath)
+  ensureVideoEditorDirectories()
+  const stat = fs.statSync(filePath)
+  const time = Math.max(0, Number(requestedTime) || 0)
+  const key = crypto.createHash('sha1').update(`thumb-v1:${filePath}:${stat.size}:${stat.mtimeMs}:${time.toFixed(2)}`).digest('hex').slice(0, 20)
+  const thumbnailPath = path.join(videoEditorThumbnailRoot, `${key}.jpg`)
+  if (safeStat(thumbnailPath)?.isFile()) return thumbnailPath
+  const running = editorThumbnailJobs.get(thumbnailPath)
+  if (running) return running
+
+  const job = editorThumbnailQueue.then(async () => {
+    const temporaryPath = `${thumbnailPath}.partial.jpg`
+    try {
+      await execFileAsync('ffmpeg', [
+        '-y', '-hide_banner', '-loglevel', 'error', '-ss', time.toFixed(3), '-i', filePath,
+        '-frames:v', '1', '-vf', 'scale=320:-2:force_original_aspect_ratio=decrease', '-q:v', '4', temporaryPath,
+      ], { maxBuffer: 8 * 1024 * 1024 })
+      fs.renameSync(temporaryPath, thumbnailPath)
+      return thumbnailPath
+    } finally {
+      fs.rmSync(temporaryPath, { force: true })
+      editorThumbnailJobs.delete(thumbnailPath)
+    }
+  })
+  editorThumbnailQueue = job.then(() => undefined, () => undefined)
+  editorThumbnailJobs.set(thumbnailPath, job)
   return job
 }
 
@@ -2470,6 +2504,27 @@ function localImageImportPlugin(): PluginOption {
         } catch (error) {
           res.statusCode = 400
           sendJson(res, { error: error instanceof Error ? error.message : '无法创建流畅预览' })
+        }
+      })
+
+      server.middlewares.use('/api/video-editor-thumbnail', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        try {
+          if (req.method !== 'GET') {
+            res.statusCode = 405
+            sendJson(res, { error: 'Method not allowed' })
+            return
+          }
+          const url = new URL(req.url || '/', 'http://127.0.0.1')
+          const filePath = url.searchParams.get('path') || ''
+          const time = Number(url.searchParams.get('time') || 0)
+          const thumbnailPath = await ensureEditorThumbnail(filePath, time)
+          res.statusCode = 200
+          res.setHeader('Content-Type', 'image/jpeg')
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+          fs.createReadStream(thumbnailPath).pipe(res)
+        } catch (error) {
+          res.statusCode = 400
+          sendJson(res, { error: error instanceof Error ? error.message : '无法生成视频缩略图' })
         }
       })
 

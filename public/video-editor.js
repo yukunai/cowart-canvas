@@ -29,6 +29,11 @@ const setStatus = (text) => { $('#status').textContent = text }
 const cloneSegments = () => state.segments.map((segment) => ({ ...segment }))
 const selectedDuration = () => state.segments.reduce((sum, segment) => sum + Math.max(0, segment.end - segment.start), 0)
 const clipPixelWidth = (segment) => Math.max(36, (segment.end - segment.start) * state.timelineScale)
+const thumbnailUrl = (time) => {
+  const filePath = state.source?.proxyPath || state.source?.path
+  if (!filePath) return ''
+  return `${apiBase}/api/video-editor-thumbnail?path=${encodeURIComponent(filePath)}&time=${Math.max(0, Number(time) || 0).toFixed(2)}`
+}
 
 const timelineLayout = () => {
   let x = 4
@@ -313,6 +318,7 @@ const renderSegments = () => {
     clip.className = `clip${segment.id === state.activeId ? ' active' : ''}`
     clip.dataset.id = segment.id
     clip.style.width = `${width}px`
+    clip.style.backgroundImage = `url("${thumbnailUrl(segment.start + Math.min(0.6, Math.max(0.1, (segment.end - segment.start) * 0.12)))}")`
     clip.innerHTML = `<span class="trim-handle left" title="拖动片段起点"></span><strong>${esc(segment.label || `片段 ${index + 1}`)}</strong><small>${fmt(segment.start)} - ${fmt(segment.end)}</small><span class="trim-handle right" title="拖动片段终点"></span>`
     clip.querySelector('.trim-handle.left').onpointerdown = (event) => startTrim(event, segment, 'left', clip)
     clip.querySelector('.trim-handle.right').onpointerdown = (event) => startTrim(event, segment, 'right', clip)
@@ -400,6 +406,7 @@ const loadSource = (source) => {
   $('#fileName').textContent = source.name
   $('#fileMeta').textContent = `${source.meta.width} × ${source.meta.height} · ${fmt(source.meta.duration)} · ${(source.meta.size / 1024 / 1024).toFixed(1)} MB`
   $('#fileSummary').classList.add('visible')
+  $('.file-poster').style.backgroundImage = `url("${thumbnailUrl(0.5)}")`
   $('#dropzone').hidden = true
   const video = $('#preview')
   video.preload = 'auto'

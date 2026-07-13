@@ -56,6 +56,7 @@ The app runs on your own machine. Imported images, generated task files, video t
 - View video task history in the right-side canvas area.
 - Refresh provider results, preview videos, download videos, and save videos directly to `~/Downloads/Cowart Videos`.
 - Use a standalone Video Editor with AI Highlights, Film Commentary, and Manual Editing workflows.
+- Work in a dark professional editing layout with media thumbnails, preview and inspector areas, real clip-frame thumbnails, a green source-audio waveform, and a bottom multitrack timeline.
 - AI Highlights uses major scene changes and speech pauses to select complete passages across the source; target duration adds or removes whole passages instead of slicing at fixed intervals.
 - Split, delete, duplicate, restore, reorder, undo/redo, and precisely trim clips on an editable timeline.
 - Zoom long timelines and navigate them with synchronized scrollbars above and below the tracks.
