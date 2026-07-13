@@ -59,6 +59,7 @@ The app runs on your own machine. Imported images, generated task files, video t
 - Split, delete, restore, reorder, and precisely trim clips on an editable timeline.
 - Use five aligned tracks: V1 main video, V2 overlays, A1 source audio, A2 narration/music, and T1 captions.
 - Convert footage between 16:9, 9:16, and 1:1 while adjusting horizontal subject framing.
+- Crop by zooming and adjusting horizontal/vertical focus with matching preview and export.
 - Draft commentary and optionally mix local macOS Chinese narration into the MP4 export.
 - Export locally with FFmpeg to `~/Downloads/Cowart Edits` without overwriting the source video.
 

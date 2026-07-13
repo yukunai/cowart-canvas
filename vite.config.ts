@@ -2258,7 +2258,7 @@ function normalizeEditorSegments(segments: EditorSegment[], duration: number) {
     .slice(0, 80)
 }
 
-async function exportEditorVideo(body: { path?: string; segments?: EditorSegment[]; aspectRatio?: string; quality?: string; title?: string; focusX?: number; commentaryScript?: string; narrationEnabled?: boolean; muteOriginal?: boolean }) {
+async function exportEditorVideo(body: { path?: string; segments?: EditorSegment[]; aspectRatio?: string; quality?: string; title?: string; focusX?: number; focusY?: number; cropZoom?: number; commentaryScript?: string; narrationEnabled?: boolean; muteOriginal?: boolean }) {
   const filePath = body.path || ''
   const meta = await probeEditorVideo(filePath)
   const segments = normalizeEditorSegments(body.segments || [], meta.duration)
@@ -2269,11 +2269,13 @@ async function exportEditorVideo(body: { path?: string; segments?: EditorSegment
   const aspect = body.aspectRatio === '9:16' ? '9:16' : body.aspectRatio === '1:1' ? '1:1' : '16:9'
   const size = aspect === '9:16' ? { width: 1080, height: 1920 } : aspect === '1:1' ? { width: 1080, height: 1080 } : { width: 1920, height: 1080 }
   const focusX = Math.min(1, Math.max(0, Number(body.focusX ?? 0.5)))
+  const focusY = Math.min(1, Math.max(0, Number(body.focusY ?? 0.5)))
+  const cropZoom = Math.min(3, Math.max(1, Number(body.cropZoom ?? 1)))
   const hasSourceAudio = meta.hasAudio && !body.muteOriginal
   const filters: string[] = []
   const concatInputs: string[] = []
   segments.forEach((segment, index) => {
-    const videoFilter = `trim=start=${segment.start}:end=${segment.end},setpts=PTS-STARTPTS,scale=${size.width}:${size.height}:force_original_aspect_ratio=increase,crop=${size.width}:${size.height}:x=(iw-ow)*${focusX.toFixed(3)}:y=(ih-oh)/2`
+    const videoFilter = `trim=start=${segment.start}:end=${segment.end},setpts=PTS-STARTPTS,scale=${size.width}:${size.height}:force_original_aspect_ratio=increase,scale=trunc(iw*${cropZoom.toFixed(3)}/2)*2:trunc(ih*${cropZoom.toFixed(3)}/2)*2,crop=${size.width}:${size.height}:x=(iw-ow)*${focusX.toFixed(3)}:y=(ih-oh)*${focusY.toFixed(3)}`
     filters.push(`[0:v]${videoFilter},setsar=1[v${index}]`)
     concatInputs.push(`[v${index}]`)
     if (hasSourceAudio) {
