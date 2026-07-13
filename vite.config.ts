@@ -2199,89 +2199,163 @@ async function ensureEditorProxy(filePath: string) {
   return job
 }
 
-function mergeEditorRanges(ranges: Array<{ start: number; end: number }>, gap = 0.18) {
-  const sorted = ranges.filter((range) => range.end - range.start >= 0.15).sort((left, right) => left.start - right.start)
-  const merged: Array<{ start: number; end: number }> = []
-  for (const range of sorted) {
-    const previous = merged[merged.length - 1]
-    if (previous && range.start <= previous.end + gap) previous.end = Math.max(previous.end, range.end)
-    else merged.push({ ...range })
-  }
-  return merged
+type EditorBoundary = { time: number; leftEnd: number; rightStart: number; kind: 'silence' | 'scene' }
+
+async function detectEditorSceneCuts(filePath: string, duration: number) {
+  const stderr = await execFileAsync('ffmpeg', [
+      '-hide_banner', '-loglevel', 'info', '-i', filePath,
+      '-vf', 'select=gt(scene\\,0.78),showinfo', '-an', '-f', 'null', '-',
+    ], { maxBuffer: 64 * 1024 * 1024 })
+    .then((result) => result.stderr)
+    .catch((error: { stderr?: string }) => error.stderr || '')
+  const cuts = [...stderr.matchAll(/pts_time:\s*([\d.]+)/g)]
+    .map((match) => Number(match[1]))
+    .filter((time) => time > 0.5 && time < duration - 0.5)
+    .sort((left, right) => left - right)
+  return cuts.filter((time, index) => index === 0 || time - cuts[index - 1] >= 0.75)
 }
 
-function buildEditorHighlights(duration: number, silences: Array<{ start: number; end: number }>, targetDuration: number, mode: string, pace = '紧凑', keepOpening = true) {
-  const content: Array<{ start: number; end: number }> = []
-  let cursor = 0
-  for (const silence of silences) {
-    if (silence.start > cursor) content.push({ start: cursor, end: silence.start })
-    cursor = Math.max(cursor, silence.end)
-  }
-  if (cursor < duration) content.push({ start: cursor, end: duration })
-  const candidates = mergeEditorRanges(content.length ? content : [{ start: 0, end: duration }], 0.35)
-    .flatMap((range) => {
-      const pieces: Array<{ start: number; end: number }> = []
-      const maxPiece = mode === 'commentary' ? 9 : pace === '舒缓' ? 18 : pace === '自然' ? 12 : 8
-      for (let start = range.start; start < range.end; start += maxPiece) pieces.push({ start, end: Math.min(start + maxPiece, range.end) })
-      return pieces
-    })
-    .filter((range) => range.end - range.start >= 0.8)
+function buildNaturalEditorRanges(duration: number, silences: Array<{ start: number; end: number }>, sceneCuts: number[], mode: string, pace = '紧凑') {
+  const preferred = mode === 'commentary' ? 12 : pace === '舒缓' ? 24 : pace === '自然' ? 17 : 11
+  const minimum = mode === 'commentary' ? 5 : pace === '舒缓' ? 9 : pace === '自然' ? 7 : 4.5
+  const maximum = mode === 'commentary' ? 22 : pace === '舒缓' ? 38 : pace === '自然' ? 30 : 20
+  const boundaries: EditorBoundary[] = [
+    ...silences
+      .filter((silence) => silence.end - silence.start >= 0.45)
+      .map((silence) => ({
+        time: (silence.start + silence.end) / 2,
+        leftEnd: silence.start,
+        rightStart: silence.end,
+        kind: 'silence' as const,
+      })),
+    ...sceneCuts.map((time) => ({ time, leftEnd: time, rightStart: time, kind: 'scene' as const })),
+  ].sort((left, right) => left.time - right.time)
 
+  const ranges: Array<{ start: number; end: number }> = []
+  let start = 0
+  while (start < duration - 0.2) {
+    const viable = boundaries.filter((boundary) => boundary.leftEnd >= start + minimum && boundary.leftEnd <= start + maximum)
+    let boundary: EditorBoundary | undefined = viable
+      .map((candidate) => ({
+        candidate,
+        distance: Math.abs(candidate.leftEnd - (start + preferred)) - (candidate.kind === 'silence' ? 2.4 : 0),
+      }))
+      .sort((left, right) => left.distance - right.distance)[0]?.candidate
+    if (!boundary) boundary = boundaries.find((candidate) => candidate.leftEnd > start + minimum)
+    const end = Math.min(duration, boundary?.leftEnd ?? duration)
+    if (end - start >= 0.8) ranges.push({ start, end })
+    const nextStart = Math.max(end, boundary?.rightStart ?? duration)
+    if (nextStart <= start + 0.05) break
+    start = nextStart
+  }
+
+  if (ranges.length > 1) {
+    const last = ranges[ranges.length - 1]
+    if (last.end - last.start < minimum * 0.72) {
+      ranges[ranges.length - 2].end = last.end
+      ranges.pop()
+    }
+  }
+  return ranges
+}
+
+function buildEditorHighlights(duration: number, silences: Array<{ start: number; end: number }>, sceneCuts: number[], targetDuration: number, mode: string, pace = '紧凑', keepOpening = true) {
+  const candidates = buildNaturalEditorRanges(duration, silences, sceneCuts, mode, pace)
   const wanted = Math.min(Math.max(targetDuration || duration * 0.35, 4), duration)
   const ranked = candidates
-    .map((range, index) => {
+    .map((range) => {
       const length = range.end - range.start
       const position = duration ? range.start / duration : 0
-      const openingBonus = keepOpening && position < 0.12 ? 0.15 : 0
-      const endingBonus = keepOpening && position > 0.82 ? 0.08 : 0
-      const rhythmBonus = Math.min(length / 8, 1) * 0.35
-      return { ...range, score: 0.45 + openingBonus + endingBonus + rhythmBonus + (index % 3) * 0.025 }
+      const silentDuration = silences.reduce((sum, silence) => sum + Math.max(0, Math.min(range.end, silence.end) - Math.max(range.start, silence.start)), 0)
+      const speechRatio = Math.max(0, 1 - silentDuration / Math.max(length, 0.1))
+      const sceneCount = sceneCuts.filter((time) => time > range.start && time < range.end).length
+      const openingBonus = keepOpening && position < 0.08 ? 0.18 : 0
+      const endingBonus = keepOpening && position > 0.88 ? 0.1 : 0
+      const visualBonus = Math.min(sceneCount / 4, 1) * 0.12
+      return { ...range, score: speechRatio * 0.55 + visualBonus + openingBonus + endingBonus }
     })
     .sort((left, right) => right.score - left.score)
 
+  const typicalLength = mode === 'commentary' ? 12 : pace === '舒缓' ? 24 : pace === '自然' ? 17 : 11
+  const desiredCount = Math.max(2, Math.min(12, Math.round(wanted / typicalLength)))
+  const windowSize = duration / desiredCount
   const chosen: typeof ranked = []
-  let total = 0
+  for (let index = 0; index < desiredCount; index += 1) {
+    const windowStart = index * windowSize
+    const windowEnd = index === desiredCount - 1 ? duration + 0.01 : (index + 1) * windowSize
+    const choice = candidates
+      .filter((range) => {
+        const midpoint = (range.start + range.end) / 2
+        return midpoint >= windowStart && midpoint < windowEnd
+      })
+      .map((range) => ranked.find((candidate) => candidate.start === range.start && candidate.end === range.end)!)
+      .sort((left, right) => right.score - left.score)[0]
+    if (choice) chosen.push(choice)
+  }
+
+  let total = chosen.reduce((sum, range) => sum + range.end - range.start, 0)
   for (const range of ranked) {
-    if (total >= wanted) break
-    const remaining = wanted - total
-    const end = remaining < range.end - range.start ? range.start + Math.max(remaining, 1) : range.end
-    chosen.push({ ...range, end })
-    total += end - range.start
+    if (total >= wanted * 0.9) break
+    if (chosen.includes(range)) continue
+    const touchesChosen = chosen.some((item) => range.start < item.end + 1.5 && range.end > item.start - 1.5)
+    if (touchesChosen) continue
+    chosen.push(range)
+    total += range.end - range.start
+  }
+  while (chosen.length > 2) {
+    const currentDifference = Math.abs(total - wanted)
+    const removal = chosen
+      .map((range, index) => {
+        const nextTotal = total - (range.end - range.start)
+        return { index, nextTotal, difference: Math.abs(nextTotal - wanted) }
+      })
+      .filter((candidate) => candidate.nextTotal >= wanted * 0.82 && candidate.difference < currentDifference)
+      .sort((left, right) => left.difference - right.difference)[0]
+    if (!removal) break
+    chosen.splice(removal.index, 1)
+    total = removal.nextTotal
   }
   return chosen
     .sort((left, right) => left.start - right.start)
-    .map((range, index) => ({ id: `ai-${index + 1}`, start: Number(range.start.toFixed(3)), end: Number(range.end.toFixed(3)), score: range.score, label: mode === 'commentary' ? `解说画面 ${index + 1}` : `精华 ${index + 1}` }))
+    .map((range, index) => ({
+      id: `ai-${index + 1}`,
+      start: Number(range.start.toFixed(3)),
+      end: Number(range.end.toFixed(3)),
+      score: range.score,
+      label: mode === 'commentary' ? `完整解说段 ${index + 1}` : `完整精华段 ${index + 1}`,
+    }))
 }
 
 async function analyzeEditorVideo(filePath: string, targetDuration: number, mode: string, options?: { removeSilence?: boolean; keepOpening?: boolean; pace?: string; goal?: string }) {
   const meta = await probeEditorVideo(filePath)
+  const analysisPath = await ensureEditorProxy(filePath).catch(() => filePath)
   const silences: Array<{ start: number; end: number }> = []
   if (meta.hasAudio && options?.removeSilence !== false) {
-    try {
-      await execFileAsync('ffmpeg', ['-hide_banner', '-i', filePath, '-af', 'silencedetect=noise=-34dB:d=0.55', '-f', 'null', '-'], {
+    const silenceOutput = await execFileAsync('ffmpeg', ['-hide_banner', '-i', analysisPath, '-af', 'silencedetect=noise=-34dB:d=0.55', '-vn', '-f', 'null', '-'], {
         maxBuffer: 32 * 1024 * 1024,
       })
-    } catch (error) {
-      const stderr = (error as { stderr?: string }).stderr || ''
-      const lines = stderr.split('\n')
-      let pendingStart: number | null = null
-      for (const line of lines) {
-        const startMatch = line.match(/silence_start:\s*([\d.]+)/)
-        const endMatch = line.match(/silence_end:\s*([\d.]+)/)
-        if (startMatch) pendingStart = Number(startMatch[1])
-        if (endMatch && pendingStart !== null) {
-          silences.push({ start: pendingStart, end: Number(endMatch[1]) })
-          pendingStart = null
-        }
+      .then((result) => result.stderr)
+      .catch((error: { stderr?: string }) => error.stderr || '')
+    const lines = silenceOutput.split('\n')
+    let pendingStart: number | null = null
+    for (const line of lines) {
+      const startMatch = line.match(/silence_start:\s*([\d.]+)/)
+      const endMatch = line.match(/silence_end:\s*([\d.]+)/)
+      if (startMatch) pendingStart = Number(startMatch[1])
+      if (endMatch && pendingStart !== null) {
+        silences.push({ start: pendingStart, end: Number(endMatch[1]) })
+        pendingStart = null
       }
     }
   }
-  const segments = buildEditorHighlights(meta.duration, silences, targetDuration, mode, options?.pace, options?.keepOpening !== false)
+  const sceneCuts = await detectEditorSceneCuts(analysisPath, meta.duration)
+  const segments = buildEditorHighlights(meta.duration, silences, sceneCuts, targetDuration, mode, options?.pace, options?.keepOpening !== false)
   return {
     meta,
     silences,
+    sceneCuts,
     segments,
-    summary: mode === 'commentary' ? `已提取适合解说节奏的关键画面${options?.goal ? `，优先要求：${options.goal}` : ''}。可在左侧修改解说词，并在时间线上恢复或删除片段。` : `已按${options?.pace || '紧凑'}节奏保留信息密度较高的片段${options?.removeSilence === false ? '' : '，并移除明显静音'}。所有自动选择都可以继续手动修改。`,
+    summary: mode === 'commentary' ? `已按镜头变化和说话停顿提取完整解说段${options?.goal ? `，优先要求：${options.goal}` : ''}。不会为了凑时长截断最后一段。` : `已按镜头变化和说话停顿保留完整精华段${options?.removeSilence === false ? '' : '，并跳过明显静音'}。每段都使用自然起止点，不再按固定秒数切碎。`,
   }
 }
 
