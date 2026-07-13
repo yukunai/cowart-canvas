@@ -2,7 +2,7 @@
 
 **Languages:** [English](README.md) | [简体中文](README.zh-CN.md)
 
-Cowart Canvas is a local creative workbench for AI image editing, image generation, image-to-video tasks, product-detail design, and Markdown notes. Its core workflow is simple: put an image on a canvas, mark the exact places that need changes, then turn those visual notes into a Codex-ready edit request or a direct image-edit API call.
+Cowart Canvas is a local creative workbench for AI image editing, image generation, image-to-video tasks, AI video editing, product-detail design, and Markdown notes. Its core workflow is simple: put an image on a canvas, mark the exact places that need changes, then turn those visual notes into a Codex-ready edit request or a direct image-edit API call.
 
 The interface is bilingual: Chinese and English are both built in, and users can switch languages from the top-left toolbar.
 
@@ -55,6 +55,11 @@ The app runs on your own machine. Imported images, generated task files, video t
 - Configure video provider API keys in the front-end settings panel or `.env.local`.
 - View video task history in the right-side canvas area.
 - Refresh provider results, preview videos, download videos, and save videos directly to `~/Downloads/Cowart Videos`.
+- Use a standalone Video Editor with AI Highlights, Film Commentary, and Manual Editing workflows.
+- Split, delete, restore, reorder, and precisely trim clips on an editable timeline.
+- Convert footage between 16:9, 9:16, and 1:1 while adjusting horizontal subject framing.
+- Draft commentary and optionally mix local macOS Chinese narration into the MP4 export.
+- Export locally with FFmpeg to `~/Downloads/Cowart Edits` without overwriting the source video.
 
 ## Requirements
 
@@ -113,6 +118,12 @@ Standalone image generation / editing page:
 
 ```text
 http://127.0.0.1:43219/image-generator.html
+```
+
+Standalone AI video editor:
+
+```text
+http://127.0.0.1:43219/video-editor.html
 ```
 
 ## macOS Background Service

@@ -2,10 +2,14 @@ import { defineConfig, loadEnv } from 'vite'
 import type { Connect, PluginOption, ViteDevServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import crypto from 'node:crypto'
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
 
 const imageMimeTypes: Record<string, string> = {
   '.avif': 'image/avif',
@@ -1791,16 +1795,16 @@ async function refreshVideoTask(id?: string) {
   if (!currentTask) throw new Error('读不到这个视频任务')
   if (!currentTask.taskId) throw new Error('这个任务还没有平台任务 ID')
 
-  if (currentTask.provider !== 'wanxiang') throw new Error(`暂时只支持自动查询阿里万象任务，${currentTask.providerName ?? '这个平台'} 需要手动刷新平台结果`)
-
-  const apiKey = process.env.DASHSCOPE_API_KEY
-  if (!apiKey) throw new Error('缺少 DASHSCOPE_API_KEY，不能查询阿里万象任务')
+  if (currentTask.provider !== 'wanxiang') {
+    throw new Error(`暂时只支持自动查询阿里万象任务，${currentTask.providerName ?? '这个平台'} 需要手动刷新平台结果`)
+  }
+  if (!process.env.DASHSCOPE_API_KEY) throw new Error('缺少 DASHSCOPE_API_KEY，不能查询阿里万象任务')
 
   const providerResponsePath = path.join(target.directory, 'provider-response.json')
   const previousResponse = readJsonFile(providerResponsePath)
   const previousPayload = isRecord(previousResponse) ? previousResponse.payload ?? previousResponse.previousPayload : undefined
   const providerResponse = await getProviderJson(buildDashScopeTaskEndpoint(currentTask.taskId), {
-    Authorization: `Bearer ${apiKey}`,
+    Authorization: `Bearer ${process.env.DASHSCOPE_API_KEY || ''}`,
   })
 
   writeJson(providerResponsePath, {
@@ -2094,10 +2098,279 @@ function getRecentDownloadImages() {
     .slice(0, 80)
 }
 
+type EditorSegment = {
+  id?: string
+  start: number
+  end: number
+  label?: string
+  score?: number
+}
+
+const videoEditorRoot = path.join(os.homedir(), '.cowart-canvas', 'video-editor')
+const videoEditorUploadRoot = path.join(videoEditorRoot, 'uploads')
+const videoEditorExportRoot = path.join(os.homedir(), 'Downloads', 'Cowart Edits')
+
+function ensureVideoEditorDirectories() {
+  fs.mkdirSync(videoEditorUploadRoot, { recursive: true })
+  fs.mkdirSync(videoEditorExportRoot, { recursive: true })
+}
+
+function readBinaryBody(req: IncomingMessage, maxBytes = 1024 * 1024 * 1024) {
+  return new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = []
+    let size = 0
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length
+      if (size > maxBytes) {
+        reject(new Error('Video is larger than 1 GB'))
+        req.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
+
+function isAllowedEditorVideo(filePath: string) {
+  const resolved = path.resolve(filePath)
+  const allowedRoots = [path.resolve(videoEditorRoot), path.resolve(path.join(os.homedir(), 'Downloads'))]
+  return allowedRoots.some((root) => resolved === root || resolved.startsWith(`${root}${path.sep}`))
+}
+
+async function probeEditorVideo(filePath: string) {
+  if (!path.isAbsolute(filePath) || !isAllowedEditorVideo(filePath) || !fs.existsSync(filePath)) throw new Error('Video file is not available')
+  const { stdout } = await execFileAsync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', filePath], {
+    maxBuffer: 8 * 1024 * 1024,
+  })
+  const data = JSON.parse(stdout) as {
+    streams?: Array<{ codec_type?: string; width?: number; height?: number; duration?: string; avg_frame_rate?: string }>
+    format?: { duration?: string; size?: string; bit_rate?: string }
+  }
+  const video = data.streams?.find((stream) => stream.codec_type === 'video')
+  const audio = data.streams?.find((stream) => stream.codec_type === 'audio')
+  return {
+    duration: Number(data.format?.duration || video?.duration || 0),
+    width: Number(video?.width || 0),
+    height: Number(video?.height || 0),
+    hasAudio: Boolean(audio),
+    size: Number(data.format?.size || 0),
+    frameRate: video?.avg_frame_rate || '',
+  }
+}
+
+function mergeEditorRanges(ranges: Array<{ start: number; end: number }>, gap = 0.18) {
+  const sorted = ranges.filter((range) => range.end - range.start >= 0.15).sort((left, right) => left.start - right.start)
+  const merged: Array<{ start: number; end: number }> = []
+  for (const range of sorted) {
+    const previous = merged[merged.length - 1]
+    if (previous && range.start <= previous.end + gap) previous.end = Math.max(previous.end, range.end)
+    else merged.push({ ...range })
+  }
+  return merged
+}
+
+function buildEditorHighlights(duration: number, silences: Array<{ start: number; end: number }>, targetDuration: number, mode: string, pace = '紧凑', keepOpening = true) {
+  const content: Array<{ start: number; end: number }> = []
+  let cursor = 0
+  for (const silence of silences) {
+    if (silence.start > cursor) content.push({ start: cursor, end: silence.start })
+    cursor = Math.max(cursor, silence.end)
+  }
+  if (cursor < duration) content.push({ start: cursor, end: duration })
+  const candidates = mergeEditorRanges(content.length ? content : [{ start: 0, end: duration }], 0.35)
+    .flatMap((range) => {
+      const pieces: Array<{ start: number; end: number }> = []
+      const maxPiece = mode === 'commentary' ? 9 : pace === '舒缓' ? 18 : pace === '自然' ? 12 : 8
+      for (let start = range.start; start < range.end; start += maxPiece) pieces.push({ start, end: Math.min(start + maxPiece, range.end) })
+      return pieces
+    })
+    .filter((range) => range.end - range.start >= 0.8)
+
+  const wanted = Math.min(Math.max(targetDuration || duration * 0.35, 4), duration)
+  const ranked = candidates
+    .map((range, index) => {
+      const length = range.end - range.start
+      const position = duration ? range.start / duration : 0
+      const openingBonus = keepOpening && position < 0.12 ? 0.15 : 0
+      const endingBonus = keepOpening && position > 0.82 ? 0.08 : 0
+      const rhythmBonus = Math.min(length / 8, 1) * 0.35
+      return { ...range, score: 0.45 + openingBonus + endingBonus + rhythmBonus + (index % 3) * 0.025 }
+    })
+    .sort((left, right) => right.score - left.score)
+
+  const chosen: typeof ranked = []
+  let total = 0
+  for (const range of ranked) {
+    if (total >= wanted) break
+    const remaining = wanted - total
+    const end = remaining < range.end - range.start ? range.start + Math.max(remaining, 1) : range.end
+    chosen.push({ ...range, end })
+    total += end - range.start
+  }
+  return chosen
+    .sort((left, right) => left.start - right.start)
+    .map((range, index) => ({ id: `ai-${index + 1}`, start: Number(range.start.toFixed(3)), end: Number(range.end.toFixed(3)), score: range.score, label: mode === 'commentary' ? `解说画面 ${index + 1}` : `精华 ${index + 1}` }))
+}
+
+async function analyzeEditorVideo(filePath: string, targetDuration: number, mode: string, options?: { removeSilence?: boolean; keepOpening?: boolean; pace?: string; goal?: string }) {
+  const meta = await probeEditorVideo(filePath)
+  const silences: Array<{ start: number; end: number }> = []
+  if (meta.hasAudio && options?.removeSilence !== false) {
+    try {
+      await execFileAsync('ffmpeg', ['-hide_banner', '-i', filePath, '-af', 'silencedetect=noise=-34dB:d=0.55', '-f', 'null', '-'], {
+        maxBuffer: 32 * 1024 * 1024,
+      })
+    } catch (error) {
+      const stderr = (error as { stderr?: string }).stderr || ''
+      const lines = stderr.split('\n')
+      let pendingStart: number | null = null
+      for (const line of lines) {
+        const startMatch = line.match(/silence_start:\s*([\d.]+)/)
+        const endMatch = line.match(/silence_end:\s*([\d.]+)/)
+        if (startMatch) pendingStart = Number(startMatch[1])
+        if (endMatch && pendingStart !== null) {
+          silences.push({ start: pendingStart, end: Number(endMatch[1]) })
+          pendingStart = null
+        }
+      }
+    }
+  }
+  const segments = buildEditorHighlights(meta.duration, silences, targetDuration, mode, options?.pace, options?.keepOpening !== false)
+  return {
+    meta,
+    silences,
+    segments,
+    summary: mode === 'commentary' ? `已提取适合解说节奏的关键画面${options?.goal ? `，优先要求：${options.goal}` : ''}。可在左侧修改解说词，并在时间线上恢复或删除片段。` : `已按${options?.pace || '紧凑'}节奏保留信息密度较高的片段${options?.removeSilence === false ? '' : '，并移除明显静音'}。所有自动选择都可以继续手动修改。`,
+  }
+}
+
+function normalizeEditorSegments(segments: EditorSegment[], duration: number) {
+  return segments
+    .map((segment, index) => ({
+      id: segment.id || `segment-${index + 1}`,
+      start: Math.max(0, Number(segment.start) || 0),
+      end: Math.min(duration, Number(segment.end) || duration),
+      label: segment.label || `片段 ${index + 1}`,
+    }))
+    .filter((segment) => segment.end - segment.start >= 0.12)
+    .slice(0, 80)
+}
+
+async function exportEditorVideo(body: { path?: string; segments?: EditorSegment[]; aspectRatio?: string; quality?: string; title?: string; focusX?: number; commentaryScript?: string; narrationEnabled?: boolean }) {
+  const filePath = body.path || ''
+  const meta = await probeEditorVideo(filePath)
+  const segments = normalizeEditorSegments(body.segments || [], meta.duration)
+  if (!segments.length) throw new Error('No editable clips were selected')
+  ensureVideoEditorDirectories()
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const outputPath = path.join(videoEditorExportRoot, `${stamp}-${safeSlug(body.title || 'cowart-edit')}.mp4`)
+  const aspect = body.aspectRatio === '9:16' ? '9:16' : body.aspectRatio === '1:1' ? '1:1' : '16:9'
+  const size = aspect === '9:16' ? { width: 1080, height: 1920 } : aspect === '1:1' ? { width: 1080, height: 1080 } : { width: 1920, height: 1080 }
+  const focusX = Math.min(1, Math.max(0, Number(body.focusX ?? 0.5)))
+  const filters: string[] = []
+  const concatInputs: string[] = []
+  segments.forEach((segment, index) => {
+    const videoFilter = `trim=start=${segment.start}:end=${segment.end},setpts=PTS-STARTPTS,scale=${size.width}:${size.height}:force_original_aspect_ratio=increase,crop=${size.width}:${size.height}:x=(iw-ow)*${focusX.toFixed(3)}:y=(ih-oh)/2`
+    filters.push(`[0:v]${videoFilter},setsar=1[v${index}]`)
+    concatInputs.push(`[v${index}]`)
+    if (meta.hasAudio) {
+      filters.push(`[0:a]atrim=start=${segment.start}:end=${segment.end},asetpts=PTS-STARTPTS[a${index}]`)
+      concatInputs.push(`[a${index}]`)
+    }
+  })
+  filters.push(`${concatInputs.join('')}concat=n=${segments.length}:v=1:a=${meta.hasAudio ? 1 : 0}[vout]${meta.hasAudio ? '[aout]' : ''}`)
+  const narrationText = body.narrationEnabled ? String(body.commentaryScript || '').trim().slice(0, 8000) : ''
+  const narrationPath = path.join(videoEditorRoot, `${stamp}-narration.aiff`)
+  let hasNarration = false
+  if (narrationText && process.platform === 'darwin') {
+    try {
+      await execFileAsync('say', ['-v', 'Tingting', '-r', '185', '-o', narrationPath, narrationText], { maxBuffer: 4 * 1024 * 1024 })
+      hasNarration = fs.existsSync(narrationPath)
+    } catch {
+      hasNarration = false
+    }
+  }
+  const args = ['-y', '-hide_banner', '-i', filePath]
+  if (hasNarration) args.push('-i', narrationPath)
+  if (hasNarration && meta.hasAudio) filters.push('[aout]volume=0.22[abase];[1:a]volume=1.0[voice];[abase][voice]amix=inputs=2:duration=first:dropout_transition=2[amixed]')
+  args.push('-filter_complex', filters.join(';'), '-map', '[vout]')
+  if (hasNarration && meta.hasAudio) args.push('-map', '[amixed]')
+  else if (hasNarration) args.push('-map', '1:a')
+  else if (meta.hasAudio) args.push('-map', '[aout]')
+  args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', body.quality === 'high' ? '18' : '22', '-pix_fmt', 'yuv420p')
+  if (meta.hasAudio) args.push('-c:a', 'aac', '-b:a', '160k')
+  else if (hasNarration) args.push('-c:a', 'aac', '-b:a', '160k')
+  args.push('-movflags', '+faststart', outputPath)
+  await execFileAsync('ffmpeg', args, { maxBuffer: 64 * 1024 * 1024 })
+  if (hasNarration) fs.rmSync(narrationPath, { force: true })
+  return { outputPath, url: `/api/local-video?path=${encodeURIComponent(outputPath)}`, segments, aspectRatio: aspect }
+}
+
 function localImageImportPlugin(): PluginOption {
   return {
     name: 'cowart-local-image-import',
     configureServer(server: ViteDevServer) {
+      server.middlewares.use('/api/video-editor-upload', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        try {
+          if (req.method !== 'POST') {
+            res.statusCode = 405
+            sendJson(res, { error: 'Method not allowed' })
+            return
+          }
+          ensureVideoEditorDirectories()
+          const originalName = decodeURIComponent(String(req.headers['x-file-name'] || 'video.mp4'))
+          const extension = path.extname(originalName).toLowerCase()
+          if (!videoMimeTypes[extension]) {
+            res.statusCode = 415
+            sendJson(res, { error: '只支持 MP4、MOV、M4V 或 WebM 视频' })
+            return
+          }
+          const buffer = await readBinaryBody(req)
+          if (!buffer.length) throw new Error('视频文件为空')
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+          const filePath = path.join(videoEditorUploadRoot, `${stamp}-${safeSlug(originalName)}${extension}`)
+          fs.writeFileSync(filePath, buffer)
+          const meta = await probeEditorVideo(filePath)
+          sendJson(res, { path: filePath, name: originalName, meta, url: `/api/local-video?path=${encodeURIComponent(filePath)}` })
+        } catch (error) {
+          res.statusCode = 400
+          sendJson(res, { error: error instanceof Error ? error.message : '无法导入视频' })
+        }
+      })
+
+      server.middlewares.use('/api/video-editor-analyze', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        try {
+          if (req.method !== 'POST') {
+            res.statusCode = 405
+            sendJson(res, { error: 'Method not allowed' })
+            return
+          }
+          const body = (await readJsonBody(req, 2 * 1024 * 1024)) as { path?: string; targetDuration?: number; mode?: string; removeSilence?: boolean; keepOpening?: boolean; pace?: string; goal?: string }
+          if (!body.path) throw new Error('请先导入视频')
+          sendJson(res, await analyzeEditorVideo(body.path, Number(body.targetDuration || 60), body.mode || 'highlights', body))
+        } catch (error) {
+          res.statusCode = 400
+          sendJson(res, { error: error instanceof Error ? error.message : '分析视频失败' })
+        }
+      })
+
+      server.middlewares.use('/api/video-editor-export', async (req: Connect.IncomingMessage, res: ServerResponse) => {
+        try {
+          if (req.method !== 'POST') {
+            res.statusCode = 405
+            sendJson(res, { error: 'Method not allowed' })
+            return
+          }
+          const body = (await readJsonBody(req, 4 * 1024 * 1024)) as Parameters<typeof exportEditorVideo>[0]
+          sendJson(res, await exportEditorVideo(body))
+        } catch (error) {
+          res.statusCode = 400
+          sendJson(res, { error: error instanceof Error ? error.message : '导出视频失败' })
+        }
+      })
+
       server.middlewares.use('/api/recent-images', (_req: Connect.IncomingMessage, res: ServerResponse) => {
         try {
           sendJson(res, { images: getRecentImages() })
@@ -2799,10 +3072,10 @@ function localImageImportPlugin(): PluginOption {
             res.statusCode = 502
             sendJson(res, {
               error: `${providerRequest.providerName} 返回 ${providerResponse.status}`,
-              provider,
-              providerName: providerRequest.providerName,
-              directory,
-              imagePath,
+            provider,
+            providerName: providerRequest.providerName,
+            directory,
+            imagePath,
               requestPath,
               providerRequestPath,
               providerResponsePath,

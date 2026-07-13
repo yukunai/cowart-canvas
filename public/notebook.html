@@ -679,6 +679,7 @@
             <button type="button" id="imageButton">图片</button>
             <button type="button" id="designButton">设计</button>
             <button type="button" id="videoButton">视频</button>
+            <button type="button" id="editorButton">剪辑</button>
             <button type="button" id="canvasButton">画布</button>
             <button type="button" class="active" id="textButton">文本</button>
           </div>
@@ -972,6 +973,11 @@
         if (!hasLocalChanges) return saveInFlight;
         saveInFlight = saveNotebookToDisk().catch(() => {});
         return saveInFlight;
+      }
+
+      function clearNoteSearch() {
+        searchQuery = "";
+        noteSearchInput.value = "";
       }
 
       function activeCategory() {
@@ -1415,8 +1421,16 @@
         category.notes.unshift(note);
         activeCategoryId = category.id;
         activeNoteId = note.id;
+        editingCategoryId = "";
+        editingNoteId = "";
+        clearNoteSearch();
         saveNotebook();
         renderAll();
+        setTimeout(() => {
+          noteContentInput.focus();
+          noteContentInput.setSelectionRange(noteContentInput.value.length, noteContentInput.value.length);
+        }, 0);
+        flushNotebookSave();
       }
 
       function confirmAddNote() {
@@ -1590,6 +1604,19 @@
         }
       }
 
+      function imageFileFromPaste(event) {
+        const files = Array.from(event.clipboardData?.files || []);
+        const directFile = files.find((file) => file.type.startsWith("image/"));
+        if (directFile) return directFile;
+        const items = Array.from(event.clipboardData?.items || []);
+        for (const item of items) {
+          if (!item.type.startsWith("image/")) continue;
+          const file = item.getAsFile();
+          if (file) return file;
+        }
+        return null;
+      }
+
       async function showRecentImages() {
         recentImagePopover.classList.add("open");
         recentImageGrid.innerHTML = "<div class='empty'>正在读取...</div>";
@@ -1731,6 +1758,9 @@
       document.querySelector("#videoButton").addEventListener("click", () => {
         window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1&video=1` : "/?installed=1&video=1";
       });
+      document.querySelector("#editorButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/video-editor.html` : "/video-editor.html";
+      });
       document.querySelector("#canvasButton").addEventListener("click", () => {
         window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1` : "/?installed=1";
       });
@@ -1780,7 +1810,7 @@
       noteContentInput.addEventListener("change", flushNotebookSave);
       noteContentInput.addEventListener("blur", flushNotebookSave);
       noteContentInput.addEventListener("paste", (event) => {
-        const image = [...(event.clipboardData?.files || [])].find((file) => file.type.startsWith("image/"));
+        const image = imageFileFromPaste(event);
         if (!image) return;
         event.preventDefault();
         uploadNoteImage(image);

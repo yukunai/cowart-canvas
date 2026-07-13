@@ -447,6 +447,7 @@
             <button type="button" id="imagePageButton">图片</button>
             <button type="button" class="active" id="designButton">设计</button>
             <button type="button" id="videoButton">视频</button>
+            <button type="button" id="editorButton">剪辑</button>
             <button type="button" id="canvasButton">画布</button>
             <button type="button" id="notebookButton">文本</button>
           </div>
@@ -1074,6 +1075,9 @@
       });
       document.querySelector("#videoButton").addEventListener("click", () => {
         window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1&video=1` : "/?installed=1&video=1";
+      });
+      document.querySelector("#editorButton").addEventListener("click", () => {
+        window.location.href = location.protocol === "file:" ? `${apiBase}/video-editor.html` : "/video-editor.html";
       });
       document.querySelector("#canvasButton").addEventListener("click", () => {
         window.location.href = location.protocol === "file:" ? `${apiBase}/?installed=1` : "/?installed=1";

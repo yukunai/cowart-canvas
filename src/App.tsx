@@ -2545,6 +2545,15 @@ function App() {
             </button>
             <button
               type="button"
+              className="mode-entry-button"
+              onClick={() => {
+                window.location.href = '/video-editor.html'
+              }}
+            >
+              {tr('剪辑', 'Edit')}
+            </button>
+            <button
+              type="button"
               className={`mode-entry-button ${!isVideoPanelOpen ? 'active' : ''}`}
               onClick={() => {
                 setIsVideoPanelOpen(false)
