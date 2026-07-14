@@ -86,17 +86,19 @@
       .ruler span { position: absolute; transform: translateX(-50%); }
       .timeline-stack { position: relative; display: grid; gap: 5px; margin-top: 6px; }
       .track-row { display: grid; grid-template-columns: 82px auto; min-height: 38px; border-radius: 6px; }
+      .video-track-layer { transition: background-color .12s ease; }
+      .video-track-layer.drop-target .track-label, .video-track-layer.drop-target .track { background-color: #173a54; }
       .track-label { position: sticky; left: 0; z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 5px; border-right: 1px solid #d1dae4; background: #e3e9ef; color: #435466; padding: 0 8px; font-size: 10px; font-weight: 800; }
       .track-label button { width: 22px; height: 22px; border: 0; border-radius: 5px; background: transparent; color: #647586; font-size: 10px; padding: 0; }
       .track-label button:hover, .track-label button.active { background: #fff; color: #1c61bd; }
-      .track { position: relative; display: flex; flex: 0 0 auto; gap: 4px; min-height: 38px; padding: 4px; background: #edf1f5; overflow: visible; }
+      .track { position: relative; display: block; flex: 0 0 auto; min-height: 38px; padding: 4px; background: #edf1f5; overflow: visible; }
       .track.video-track { min-height: 54px; }
       .track.audio-track { background: #edf5f1; }
       .track.narration-track { background: #f3eff8; }
       .track.caption-track { background: #f7f3ea; }
       .track.overlay-track { background: #eef1f6; }
       .track-empty { display: flex; align-items: center; color: #8a97a5; font-size: 10px; padding: 0 8px; }
-      .clip { position: relative; flex: 0 0 auto; min-width: 72px; height: 46px; overflow: hidden; border: 1px solid #7ba8e8; border-radius: 6px; background: linear-gradient(135deg, #d8e8ff, #edf4ff); color: #174f9b; cursor: grab; padding: 5px 8px; touch-action: none; user-select: none; }
+      .clip { position: absolute; top: 4px; flex: 0 0 auto; min-width: 72px; height: 46px; overflow: hidden; border: 1px solid #7ba8e8; border-radius: 6px; background: linear-gradient(135deg, #d8e8ff, #edf4ff); color: #174f9b; cursor: grab; padding: 5px 8px; touch-action: none; user-select: none; }
       .clip.dragging { opacity: .45; }
       .clip.active { border-color: #1468de; box-shadow: 0 0 0 2px rgba(36,116,237,.18); }
       .clip strong { display: block; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
@@ -105,11 +107,11 @@
       .clip:hover .trim-handle, .clip.active .trim-handle { opacity: 1; }
       .trim-handle.left { left: 0; border-right: 1px solid #4386dd; }
       .trim-handle.right { right: 0; border-left: 1px solid #4386dd; }
-      .audio-clip, .narration-clip, .caption-clip { position: relative; flex: 0 0 auto; min-width: 72px; height: 30px; overflow: hidden; border-radius: 5px; font-size: 9px; font-weight: 750; padding: 5px 7px; }
+      .audio-clip, .narration-clip, .caption-clip { position: absolute; top: 4px; flex: 0 0 auto; min-width: 72px; height: 30px; overflow: hidden; border-radius: 5px; font-size: 9px; font-weight: 750; padding: 5px 7px; }
       .audio-clip { border: 1px solid #6fb494; background: repeating-linear-gradient(90deg, #cce9dc 0 3px, #def1e8 3px 6px); color: #246449; }
       .narration-clip { border: 1px solid #a58ac7; background: #e8ddf4; color: #64458a; }
       .caption-clip { border: 1px solid #c8a45a; background: #f4e6c5; color: #795b1d; }
-      .playhead { position: absolute; top: -31px; bottom: -143px; width: 12px; margin-left: -5px; background: linear-gradient(90deg, transparent 5px, #e13c32 5px 7px, transparent 7px); cursor: ew-resize; pointer-events: auto; touch-action: none; z-index: 8; }
+      .playhead { position: absolute; top: -31px; bottom: 0; width: 12px; margin-left: -5px; background: linear-gradient(90deg, transparent 5px, #e13c32 5px 7px, transparent 7px); cursor: ew-resize; pointer-events: auto; touch-action: none; z-index: 8; }
       .playhead::before { content: ""; position: absolute; top: 0; left: 1px; width: 10px; height: 8px; background: #e13c32; clip-path: polygon(0 0,100% 0,50% 100%); }
       .analysis-card { display: grid; gap: 8px; border: 1px solid #dbe3eb; border-radius: 8px; background: #f8fafc; padding: 10px; }
       .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
@@ -269,8 +271,10 @@
             <div class="timeline-content" id="timelineContent">
               <div class="ruler" id="ruler"></div>
               <div class="timeline-stack" id="timelineStack">
-                <div class="track-row"><div class="track-label"><span>V2 叠加</span><button type="button" title="隐藏叠加轨">◉</button></div><div class="track overlay-track" id="overlayTrack"><span class="track-empty">叠加画面、图片或补充镜头</span></div></div>
-                <div class="track-row"><div class="track-label"><span>V1 主视频</span><button type="button" title="隐藏视频轨">◉</button></div><div class="track video-track" id="track"><div class="playhead" id="playhead" hidden></div></div></div>
+                <div class="playhead" id="playhead" hidden></div>
+                <div class="track-row video-track-layer" data-video-track="3"><div class="track-label"><span>V3 视频</span><button type="button" title="隐藏视频轨">◉</button></div><div class="track video-track" id="videoTrack3"><span class="track-empty">拖到这里作为上层视频</span></div></div>
+                <div class="track-row video-track-layer" data-video-track="2"><div class="track-label"><span>V2 视频</span><button type="button" title="隐藏视频轨">◉</button></div><div class="track video-track" id="overlayTrack"><span class="track-empty">拖到这里作为叠加视频</span></div></div>
+                <div class="track-row video-track-layer" data-video-track="1"><div class="track-label"><span>V1 主视频</span><button type="button" title="隐藏视频轨">◉</button></div><div class="track video-track" id="track"><span class="track-empty">主视频轨道</span></div></div>
                 <div class="track-row"><div class="track-label"><span>A1 原声</span><button type="button" class="track-mute" data-track="original" title="静音原声">M</button></div><div class="track audio-track" id="audioTrack"><span class="track-empty">源视频音频</span></div></div>
                 <div class="track-row"><div class="track-label"><span>A2 配音</span><button type="button" class="track-mute" data-track="narration" title="静音配音">M</button></div><div class="track narration-track" id="narrationTrack"><span class="track-empty">影视解说或背景音乐</span></div></div>
                 <div class="track-row"><div class="track-label"><span>T1 字幕</span><button type="button" title="隐藏字幕轨">◉</button></div><div class="track caption-track" id="captionTrack"><span class="track-empty">字幕与重点文字</span></div></div>

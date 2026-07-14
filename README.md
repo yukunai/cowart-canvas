@@ -57,11 +57,12 @@ The app runs on your own machine. Imported images, generated task files, video t
 - Refresh provider results, preview videos, download videos, and save videos directly to `~/Downloads/Cowart Videos`.
 - Use a standalone Video Editor with AI Highlights, Film Commentary, and Manual Editing workflows.
 - Work in a dark professional editing layout with media thumbnails, preview and inspector areas, real clip-frame thumbnails, a green source-audio waveform, and a bottom multitrack timeline.
+- Start with three video tracks (V1-V3), drag clips vertically between layers, and drag above the top track to create V4-V8 automatically; unused upper tracks collapse again.
 - AI Highlights uses major scene changes and speech pauses to select complete passages across the source; target duration adds or removes whole passages instead of slicing at fixed intervals.
 - Split, delete, duplicate, restore, reorder, undo/redo, and precisely trim clips on an editable timeline.
 - Zoom long timelines and navigate them with synchronized scrollbars above and below the tracks.
 - Cache a lightweight H.264 preview proxy for AV1, 4K, and long source videos while keeping full-resolution originals for final export.
-- Use five aligned tracks: V1 main video, V2 overlays, A1 source audio, A2 narration/music, and T1 captions.
+- Use at least three aligned video tracks plus independent A1 source audio, A2 narration/music, and T1 caption tracks.
 - Convert footage between 16:9, 9:16, and 1:1 while adjusting horizontal subject framing.
 - Crop by zooming and adjusting horizontal/vertical focus with matching preview and export.
 - Draft commentary and optionally mix local macOS Chinese narration into the MP4 export.

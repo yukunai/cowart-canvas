@@ -11,6 +11,7 @@ const state = {
   cropX: 0.5,
   cropY: 0.5,
   timelineScale: 14,
+  videoTrackCount: 3,
   undoStack: [],
   redoStack: [],
   proxyLoading: false,
@@ -82,6 +83,7 @@ const saveProject = () => {
     cropX: state.cropX,
     cropY: state.cropY,
     timelineScale: state.timelineScale,
+    videoTrackCount: state.videoTrackCount,
     commentaryScript: $('#commentaryScript').value,
     editGoal: $('#editGoal').value,
   }))
@@ -136,9 +138,7 @@ const applyTimelineGeometry = () => {
   $('#timelineScrollTopSpacer').style.width = `${totalWidth}px`
   $('#timelineScrollBottomSpacer').style.width = `${totalWidth}px`
   $('#ruler').style.width = `${layout.width}px`
-  ;['overlayTrack', 'track', 'audioTrack', 'narrationTrack', 'captionTrack'].forEach((id) => {
-    $(`#${id}`).style.width = `${layout.width}px`
-  })
+  document.querySelectorAll('.track').forEach((track) => { track.style.width = `${layout.width}px` })
   return layout
 }
 
@@ -173,17 +173,17 @@ const updatePlayhead = () => {
   if (index < 0) index = state.segments.findIndex((segment) => video.currentTime >= segment.start - 0.05 && video.currentTime <= segment.end + 0.05)
   if (index < 0) return
   const segment = state.segments[index]
-  const clip = [...document.querySelectorAll('#track .clip')].find((node) => node.dataset.id === segment.id)
+  const clip = [...document.querySelectorAll('.video-track-layer .clip')].find((node) => node.dataset.id === segment.id)
   if (!clip) return
   const ratio = Math.max(0, Math.min(1, (video.currentTime - segment.start) / Math.max(0.12, segment.end - segment.start)))
   $('#playhead').hidden = false
-  $('#playhead').style.left = `${clip.offsetLeft + ratio * clip.offsetWidth}px`
+  $('#playhead').style.left = `${82 + clip.offsetLeft + ratio * clip.offsetWidth}px`
 }
 
 const selectSegment = (segment, sourceTime = segment.start) => {
   state.activeId = segment.id
   $('#preview').currentTime = Math.max(segment.start, Math.min(segment.end - 0.01, sourceTime))
-  document.querySelectorAll('#track .clip').forEach((clip) => clip.classList.toggle('active', clip.dataset.id === segment.id))
+  document.querySelectorAll('.video-track-layer .clip').forEach((clip) => clip.classList.toggle('active', clip.dataset.id === segment.id))
   document.querySelectorAll('#segmentList .segment-row').forEach((row, index) => row.classList.toggle('active', state.segments[index]?.id === segment.id))
   syncClipEditor()
   updateHistoryButtons()
@@ -229,23 +229,123 @@ const startTrim = (event, segment, side, clip) => {
   window.addEventListener('pointerup', finish, { once: true })
 }
 
+let nativeTrackDrag = null
+
+const configureVideoTrackDrop = (row) => {
+  row.ondragover = (event) => {
+    if (!nativeTrackDrag) return
+    event.preventDefault()
+    nativeTrackDrag.lastY = event.clientY
+    clearTrackDropTargets()
+    row.classList.add('drop-target')
+  }
+  row.ondragleave = (event) => {
+    if (!row.contains(event.relatedTarget)) row.classList.remove('drop-target')
+  }
+  row.ondrop = (event) => {
+    event.preventDefault()
+    const drag = nativeTrackDrag
+    nativeTrackDrag = null
+    clearTrackDropTargets()
+    if (!drag) return
+    const segment = state.segments.find((item) => item.id === drag.id)
+    if (!segment) return
+    let targetTrack = Number(row.dataset.videoTrack || 1)
+    const topRow = document.querySelector('.video-track-layer')
+    const rowRect = row.getBoundingClientRect()
+    const dropY = Number.isFinite(drag.lastY) ? drag.lastY : event.clientY
+    if (row === topRow && dropY <= rowRect.top + 30 && state.videoTrackCount < 8) {
+      targetTrack = state.videoTrackCount + 1
+      ensureVideoTrackCount(targetTrack)
+    }
+    const previousTrack = Number(segment.videoTrack) || 1
+    let from = state.segments.findIndex((item) => item.id === segment.id)
+    let to = from
+    const trackRect = row.querySelector('.video-track').getBoundingClientRect()
+    const dropX = event.clientX - trackRect.left
+    let closest = Number.POSITIVE_INFINITY
+    timelineLayout().items.forEach((item, index) => {
+      if (item.segment.id === segment.id) return
+      const distance = Math.abs(dropX - (item.x + item.width / 2))
+      if (distance < closest) {
+        closest = distance
+        to = index
+      }
+    })
+    const orderChanged = from >= 0 && to >= 0 && from !== to && Math.abs(event.clientX - drag.startX) >= 20
+    const trackChanged = targetTrack !== previousTrack
+    if (!orderChanged && !trackChanged) {
+      renderSegments()
+      setStatus('片段位置未改变')
+      return
+    }
+    pushHistory(drag.snapshot)
+    segment.videoTrack = targetTrack
+    if (orderChanged) {
+      const [dragged] = state.segments.splice(from, 1)
+      if (to > from) to -= 1
+      state.segments.splice(Math.max(0, to), 0, dragged)
+    }
+    state.activeId = segment.id
+    renderSegments()
+    saveProject()
+    setStatus(trackChanged ? `片段已移动到 V${targetTrack} 视频轨` : '片段顺序已调整')
+  }
+}
+
+const ensureVideoTrackCount = (requestedCount) => {
+  const count = Math.max(3, Math.min(8, Number(requestedCount) || 3))
+  const stack = $('#timelineStack')
+  for (let number = 4; number <= count; number += 1) {
+    if (stack.querySelector(`[data-video-track="${number}"]`)) continue
+    const row = document.createElement('div')
+    row.className = 'track-row video-track-layer'
+    row.dataset.videoTrack = String(number)
+    row.innerHTML = `<div class="track-label"><span>V${number} 视频</span><button type="button" title="隐藏视频轨">◉</button></div><div class="track video-track" id="videoTrack${number}"><span class="track-empty">向上拖动片段可继续增加轨道</span></div>`
+    const firstVideoRow = stack.querySelector('.video-track-layer')
+    stack.insertBefore(row, firstVideoRow)
+    configureVideoTrackDrop(row)
+  }
+  state.videoTrackCount = Math.max(state.videoTrackCount, count)
+}
+
+const videoTrackElement = (number) => document.querySelector(`[data-video-track="${number}"] .video-track`)
+
+const clearTrackDropTargets = () => {
+  document.querySelectorAll('.video-track-layer.drop-target').forEach((row) => row.classList.remove('drop-target'))
+}
+
+const closestVideoTrack = (clientY) => {
+  const rows = [...document.querySelectorAll('.video-track-layer')]
+  return rows
+    .map((row) => ({ row, distance: Math.abs(clientY - (row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2)) }))
+    .sort((left, right) => left.distance - right.distance)[0]?.row || null
+}
+
 const startClipDrag = (event, segment, clip) => {
   if (event.button !== 0 || event.target.closest('.trim-handle')) return
   event.preventDefault()
-  const track = $('#track')
   const historySnapshot = cloneSegments()
   const startX = event.clientX
   const startY = event.clientY
   let moved = false
   let lastX = startX
+  let lastY = startY
   const move = (moveEvent) => {
     lastX = moveEvent.clientX
+    lastY = moveEvent.clientY
     const deltaX = lastX - startX
-    if (!moved && Math.hypot(deltaX, moveEvent.clientY - startY) < 5) return
+    const deltaY = lastY - startY
+    if (!moved && Math.hypot(deltaX, deltaY) < 5) return
     moved = true
     clip.classList.add('dragging')
-    clip.style.transform = `translateX(${deltaX}px)`
+    clip.style.transform = `translate(${deltaX}px, ${deltaY}px)`
     clip.style.zIndex = '7'
+    clearTrackDropTargets()
+    const rows = [...document.querySelectorAll('.video-track-layer')]
+    const topRow = rows[0]
+    if (topRow && lastY < topRow.getBoundingClientRect().top - 12 && state.videoTrackCount < 8) topRow.classList.add('drop-target')
+    else closestVideoTrack(lastY)?.classList.add('drop-target')
   }
   const finish = () => {
     window.removeEventListener('pointermove', move)
@@ -253,6 +353,7 @@ const startClipDrag = (event, segment, clip) => {
     clip.classList.remove('dragging')
     clip.style.transform = ''
     clip.style.zIndex = ''
+    clearTrackDropTargets()
     if (!moved) {
       const rect = clip.getBoundingClientRect()
       const ratio = Math.max(0, Math.min(1, (startX - rect.left) / rect.width))
@@ -260,25 +361,40 @@ const startClipDrag = (event, segment, clip) => {
       return
     }
     const from = state.segments.findIndex((item) => item.id === segment.id)
-    const siblings = [...track.querySelectorAll('.clip')].filter((node) => node !== clip)
+    const previousTrack = Math.max(1, Number(segment.videoTrack) || 1)
+    const rows = [...document.querySelectorAll('.video-track-layer')]
+    const topRow = rows[0]
+    let targetTrack = Number(closestVideoTrack(lastY)?.dataset.videoTrack || previousTrack)
+    if (topRow && lastY < topRow.getBoundingClientRect().top - 12 && state.videoTrackCount < 8) {
+      targetTrack = state.videoTrackCount + 1
+      ensureVideoTrackCount(targetTrack)
+    }
+    const siblings = [...document.querySelectorAll('.video-track-layer .clip')].filter((node) => node !== clip)
     let to = from
     let closest = Number.POSITIVE_INFINITY
-    siblings.forEach((node) => {
-      const rect = node.getBoundingClientRect()
-      const distance = Math.abs(lastX - (rect.left + rect.width / 2))
-      if (distance < closest) {
-        closest = distance
-        to = state.segments.findIndex((item) => item.id === node.dataset.id)
-      }
-    })
-    if (from >= 0 && to >= 0 && from !== to) {
+    if (Math.abs(lastX - startX) >= 20) {
+      siblings.forEach((node) => {
+        const rect = node.getBoundingClientRect()
+        const distance = Math.abs(lastX - (rect.left + rect.width / 2))
+        if (distance < closest) {
+          closest = distance
+          to = state.segments.findIndex((item) => item.id === node.dataset.id)
+        }
+      })
+    }
+    const trackChanged = targetTrack !== previousTrack
+    const orderChanged = from >= 0 && to >= 0 && from !== to
+    if (trackChanged || orderChanged) {
       pushHistory(historySnapshot)
-      const [dragged] = state.segments.splice(from, 1)
-      state.segments.splice(to, 0, dragged)
-      state.activeId = dragged.id
+      segment.videoTrack = targetTrack
+      if (orderChanged) {
+        const [dragged] = state.segments.splice(from, 1)
+        state.segments.splice(to, 0, dragged)
+      }
+      state.activeId = segment.id
       renderSegments()
       saveProject()
-      setStatus('片段顺序已调整')
+      setStatus(trackChanged ? `片段已移动到 V${targetTrack} 视频轨` : '片段顺序已调整')
     } else {
       renderSegments()
       setStatus('片段位置未改变')
@@ -300,34 +416,58 @@ const deleteSegment = (id) => {
 
 const renderSegments = () => {
   const scrollLeft = $('#timelineViewport').scrollLeft
-  const track = $('#track')
   const audioTrack = $('#audioTrack')
   const narrationTrack = $('#narrationTrack')
   const captionTrack = $('#captionTrack')
-  track.querySelectorAll('.clip').forEach((node) => node.remove())
+  const highestAssignedTrack = state.segments.reduce((highest, segment) => Math.max(highest, Number(segment.videoTrack) || 1), 3)
+  const requiredTrackCount = Math.max(3, Math.min(8, highestAssignedTrack))
+  document.querySelectorAll('.video-track-layer').forEach((row) => {
+    if (Number(row.dataset.videoTrack) > requiredTrackCount) row.remove()
+  })
+  state.videoTrackCount = requiredTrackCount
+  ensureVideoTrackCount(requiredTrackCount)
+  document.querySelectorAll('.video-track-layer .clip').forEach((node) => node.remove())
   audioTrack.querySelectorAll('.audio-clip').forEach((node) => node.remove())
   narrationTrack.querySelectorAll('.narration-clip').forEach((node) => node.remove())
   captionTrack.querySelectorAll('.caption-clip').forEach((node) => node.remove())
   const list = $('#segmentList')
   list.innerHTML = ''
+  const layout = timelineLayout()
 
   state.segments.forEach((segment, index) => {
-    const width = clipPixelWidth(segment)
+    const item = layout.items[index]
+    const width = item.width
+    const trackNumber = Math.max(1, Math.min(state.videoTrackCount, Number(segment.videoTrack) || 1))
+    segment.videoTrack = trackNumber
     const clip = document.createElement('button')
     clip.type = 'button'
     clip.className = `clip${segment.id === state.activeId ? ' active' : ''}`
     clip.dataset.id = segment.id
+    clip.draggable = true
     clip.style.width = `${width}px`
+    clip.style.left = `${item.x}px`
     clip.style.backgroundImage = `url("${thumbnailUrl(segment.start + Math.min(0.6, Math.max(0.1, (segment.end - segment.start) * 0.12)))}")`
     clip.innerHTML = `<span class="trim-handle left" title="拖动片段起点"></span><strong>${esc(segment.label || `片段 ${index + 1}`)}</strong><small>${fmt(segment.start)} - ${fmt(segment.end)}</small><span class="trim-handle right" title="拖动片段终点"></span>`
     clip.querySelector('.trim-handle.left').onpointerdown = (event) => startTrim(event, segment, 'left', clip)
     clip.querySelector('.trim-handle.right').onpointerdown = (event) => startTrim(event, segment, 'right', clip)
     clip.onpointerdown = (event) => startClipDrag(event, segment, clip)
-    track.append(clip)
+    clip.ondragstart = (event) => {
+      nativeTrackDrag = { id: segment.id, snapshot: cloneSegments(), startX: event.clientX }
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('text/plain', segment.id)
+      clip.classList.add('dragging')
+    }
+    clip.ondragend = () => {
+      nativeTrackDrag = null
+      clip.classList.remove('dragging')
+      clearTrackDropTargets()
+    }
+    videoTrackElement(trackNumber).append(clip)
 
     const audio = document.createElement('div')
     audio.className = 'audio-clip'
     audio.style.width = `${width}px`
+    audio.style.left = `${item.x}px`
     audio.textContent = `原声 ${index + 1}`
     audioTrack.append(audio)
 
@@ -335,6 +475,7 @@ const renderSegments = () => {
       const caption = document.createElement('div')
       caption.className = 'caption-clip'
       caption.style.width = `${width}px`
+      caption.style.left = `${item.x}px`
       caption.textContent = `字幕 ${index + 1}`
       captionTrack.append(caption)
     }
@@ -352,10 +493,14 @@ const renderSegments = () => {
     const narration = document.createElement('div')
     narration.className = 'narration-clip'
     narration.style.width = `${Math.max(120, timelineLayout().width - 8)}px`
+    narration.style.left = '4px'
     narration.textContent = 'AI 解说配音'
     narrationTrack.append(narration)
   }
 
+  document.querySelectorAll('.video-track-layer').forEach((row) => {
+    row.querySelector('.track-empty').hidden = Boolean(row.querySelector('.clip'))
+  })
   audioTrack.querySelector('.track-empty').hidden = state.segments.length > 0
   narrationTrack.querySelector('.track-empty').hidden = state.mode === 'commentary' && Boolean(narrationText)
   captionTrack.querySelector('.track-empty').hidden = state.mode === 'commentary' && state.segments.length > 0
@@ -434,7 +579,8 @@ const uploadFile = async (file) => {
     if (!response.ok || data.error) throw new Error(data.error || '导入失败')
     state.undoStack = []
     state.redoStack = []
-    state.segments = [{ id: uid(), start: 0, end: data.meta.duration, label: '完整原片' }]
+    state.videoTrackCount = 3
+    state.segments = [{ id: uid(), start: 0, end: data.meta.duration, label: '完整原片', videoTrack: 1 }]
     state.activeId = state.segments[0].id
     loadSource(data)
   } catch (error) {
@@ -449,7 +595,7 @@ const analyze = async () => {
   if (!state.source) return alert('请先导入视频')
   if (state.mode === 'manual') {
     pushHistory()
-    state.segments = [{ id: uid(), start: 0, end: state.source.meta.duration, label: '完整原片' }]
+    state.segments = [{ id: uid(), start: 0, end: state.source.meta.duration, label: '完整原片', videoTrack: 1 }]
     state.activeId = state.segments[0].id
     renderSegments()
     saveProject()
@@ -476,7 +622,7 @@ const analyze = async () => {
     if (!response.ok || data.error) throw new Error(data.error || '分析失败')
     pushHistory()
     state.analysis = data
-    state.segments = data.segments.map((segment) => ({ ...segment, id: uid() }))
+    state.segments = data.segments.map((segment) => ({ ...segment, id: uid(), videoTrack: 1 }))
     state.activeId = state.segments[0]?.id || null
     $('#analysisSummary').textContent = data.summary
     if (state.mode === 'commentary' && !$('#commentaryScript').value.trim()) draftCommentary()
@@ -572,7 +718,7 @@ const addAtPlayhead = () => {
   if (!state.source) return
   pushHistory()
   const start = $('#preview').currentTime
-  const segment = { id: uid(), start, end: Math.min(start + 5, state.source.meta.duration), label: `新增片段 ${state.segments.length + 1}` }
+  const segment = { id: uid(), start, end: Math.min(start + 5, state.source.meta.duration), label: `新增片段 ${state.segments.length + 1}`, videoTrack: 1 }
   state.segments.push(segment)
   state.activeId = segment.id
   renderSegments()
@@ -583,7 +729,7 @@ const addAtPlayhead = () => {
 const restoreFullVideo = () => {
   if (!state.source) return
   pushHistory()
-  state.segments = [{ id: uid(), start: 0, end: state.source.meta.duration, label: '完整原片' }]
+  state.segments = [{ id: uid(), start: 0, end: state.source.meta.duration, label: '完整原片', videoTrack: 1 }]
   state.activeId = state.segments[0].id
   renderSegments()
   saveProject()
@@ -791,7 +937,7 @@ $('#preview').ontimeupdate = () => {
   if (activeIndex < 0) return
   if (state.activeId !== state.segments[activeIndex].id) {
     state.activeId = state.segments[activeIndex].id
-    document.querySelectorAll('#track .clip').forEach((clip) => clip.classList.toggle('active', clip.dataset.id === state.activeId))
+    document.querySelectorAll('.video-track-layer .clip').forEach((clip) => clip.classList.toggle('active', clip.dataset.id === state.activeId))
     syncClipEditor()
   }
   updatePlayhead()
@@ -853,13 +999,18 @@ document.addEventListener('keydown', (event) => {
 })
 
 try {
+  document.querySelectorAll('.video-track-layer').forEach(configureVideoTrackDrop)
   const saved = JSON.parse(localStorage.getItem('cowart-video-editor-project') || 'null')
   if (saved) {
     state.timelineScale = Math.max(6, Math.min(30, Number(saved.timelineScale || 14)))
     $('#timelineZoom').value = String(state.timelineScale)
     if (saved.editGoal) $('#editGoal').value = saved.editGoal
     if (saved.commentaryScript) $('#commentaryScript').value = saved.commentaryScript
-    state.segments = saved.segments || []
+    state.videoTrackCount = Math.max(3, Math.min(8, Number(saved.videoTrackCount || 3)))
+    state.segments = (saved.segments || []).map((segment) => ({
+      ...segment,
+      videoTrack: Math.max(1, Math.min(state.videoTrackCount, Number(segment.videoTrack) || 1)),
+    }))
     state.activeId = saved.activeId || state.segments[0]?.id || null
     $('#cropZoom').value = String(Math.round(Number(saved.cropZoom || 1) * 100))
     $('#cropX').value = String(Math.round(Number(saved.cropX ?? 0.5) * 100))
