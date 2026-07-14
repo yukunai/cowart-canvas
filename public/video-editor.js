@@ -433,6 +433,11 @@ const renderSegments = () => {
   const list = $('#segmentList')
   list.innerHTML = ''
   const layout = timelineLayout()
+  const captionLines = $('#commentaryScript').value
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line && !/解说稿$/.test(line))
+    .map((line) => line.replace(/^(?:开场|结尾|重点)：\s*/, '').replace(/^第\s*\d+\s*段（[^）]*）：\s*/, ''))
 
   state.segments.forEach((segment, index) => {
     const item = layout.items[index]
@@ -476,7 +481,8 @@ const renderSegments = () => {
       caption.className = 'caption-clip'
       caption.style.width = `${width}px`
       caption.style.left = `${item.x}px`
-      caption.textContent = `字幕 ${index + 1}`
+      caption.textContent = segment.caption || segment.subtitle || captionLines[index] || `字幕 ${index + 1}`
+      caption.title = caption.textContent
       captionTrack.append(caption)
     }
 
