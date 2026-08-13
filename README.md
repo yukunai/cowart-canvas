@@ -1,3 +1,5 @@
+
+
 # Cowart Canvas
 
 **Languages:** [English](README.md) | [简体中文](README.zh-CN.md)
@@ -90,6 +92,7 @@ Open:
 ```text
 http://127.0.0.1:43219/?installed=1
 ```
+(To change the default port 43219, pass `--port` to `npm run dev` or set `COWART_CANVAS_PORT`. The extension popup will remember custom addresses.)
 
 The `?installed=1` flag is only a compatibility flag for the local browser layout. The app also works at:
 
